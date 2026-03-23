@@ -1,2 +1,16 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/ljijjlig/public_html/
+    - /bin/cp -R about.html $DEPLOYPATH
+    - /bin/cp -R contact.html $DEPLOYPATH
+    - /bin/cp -R index.html $DEPLOYPATH
+    - /bin/cp -R privacy.html $DEPLOYPATH
+    - /bin/cp -R quote.html $DEPLOYPATH
+    - /bin/cp -R terms.html $DEPLOYPATH
+    - /bin/cp -R track.html $DEPLOYPATH
+    - /bin/cp -R css $DEPLOYPATH
+    - /bin/cp -R js $DEPLOYPATH
+    - /bin/cp -R images $DEPLOYPATH
 # CPanel Configuration
 # Add your configuration details here.
