@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Shipment | Bani Global Logistics Limited</title>
+    <meta
+      name="description"
+      content="Track your Bani Global Logistics Limited shipment using a shipment reference number."
+    >
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="nav-wrap">
+        <a class="brand" href="index.html" aria-label="Bani Global Logistics Limited home">
+          <img src="images/logo.png" alt="Bani Global Logistics Limited Logo">
+        </a>
+        <nav class="site-nav" aria-label="Main navigation">
+          <a href="index.html">Home</a>
+          <a href="about.html">About</a>
+          <a href="quote.html">Request Quote</a>
+          <a class="active" href="track.html">Track Shipment</a>
+          <a href="contact.html">Contact</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-hero">
+        <div class="eyebrow">Shipment tracking</div>
+        <h1>Check cargo status in one place.</h1>
+        <p>
+          This page includes a working shipment lookup interface for fast status
+          visibility and a more professional customer experience.
+        </p>
+      </section>
+
+      <section class="page-section">
+        <div class="page-grid">
+          <article class="tracking-card">
+            <h3>Track Shipment</h3>
+            <p>Enter a shipment reference to review the current status update.</p>
+            <div class="tracking-search">
+              <input id="trackingInput" type="text" placeholder="Enter tracking number e.g. BANI123">
+              <button id="trackButton" type="button">Track Now</button>
+            </div>
+
+            <div class="status-card" id="trackingStatus">
+              <span id="statusBadge">Tracking Status</span>
+              <h4 id="statusTitle">Shipment received and pending next movement update.</h4>
+              <p id="statusText">
+                Enter a shipment reference to view the latest movement update.
+              </p>
+              <ul class="list status-list" id="statusDetails">
+                <li>Try BANI123, BANI456, or BANI789</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="tracking-card">
+            <h3>Tracking Support</h3>
+            <p>Use one of the available shipment references below:</p>
+            <ul class="list">
+              <li><strong>BANI123</strong> - In transit from origin hub</li>
+              <li><strong>BANI456</strong> - Under customs clearance</li>
+              <li><strong>BANI789</strong> - Out for final delivery</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-card footer-grid">
+        <div>
+          <strong>Bani Global Logistics Limited</strong>
+          <p>Shipment visibility designed for clear status updates and customer confidence.</p>
+        </div>
+        <div>
+          <strong>Quick Links</strong>
+          <div class="footer-links">
+            <a href="index.html">Home</a>
+            <a href="about.html">About Us</a>
+            <a href="quote.html">Request Quote</a>
+            <a href="contact.html">Contact</a>
+            <a href="terms.html">Terms & Conditions</a>
+            <a href="privacy.html">Privacy Policy</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <a class="whatsapp-float" href="https://wa.me/254782013236" target="_blank" rel="noopener noreferrer">
+      WhatsApp Us
+    </a>
+
+    <script src="js/script.js"></script>
+  </body>
+</html>

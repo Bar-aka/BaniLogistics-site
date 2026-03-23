@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Quote | Bani Global Logistics Limited</title>
+    <meta
+      name="description"
+      content="Request a freight quote from Bani Global Logistics Limited for imports, exports, customs handling, and delivery."
+    >
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="nav-wrap">
+        <a class="brand" href="index.html" aria-label="Bani Global Logistics Limited home">
+          <img src="images/logo.png" alt="Bani Global Logistics Limited Logo">
+        </a>
+        <nav class="site-nav" aria-label="Main navigation">
+          <a href="index.html">Home</a>
+          <a href="about.html">About</a>
+          <a class="active" href="quote.html">Request Quote</a>
+          <a href="track.html">Track Shipment</a>
+          <a href="contact.html">Contact</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-hero">
+        <div class="eyebrow">Quote request</div>
+        <h1>Tell us about your shipment.</h1>
+        <p>
+          Share your cargo details and route information so we can prepare a
+          professional estimate for your logistics needs.
+        </p>
+      </section>
+
+      <section class="page-section">
+        <div class="page-grid">
+          <article class="quote-card">
+            <h3>Request a Quote</h3>
+            <p>
+              This form gives your site a polished quote request workflow for
+              customer submissions and freight inquiries.
+            </p>
+            <form id="quoteForm">
+              <div class="form-grid">
+                <label>
+                  Full Name
+                  <input type="text" name="name" placeholder="Full Name" required>
+                </label>
+                <label>
+                  Email Address
+                  <input type="email" name="email" placeholder="Email Address" required>
+                </label>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Phone Number
+                  <input type="text" name="phone" placeholder="Phone Number">
+                </label>
+                <label>
+                  Shipment Type
+                  <select name="type">
+                    <option>Import</option>
+                    <option>Export</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Origin Country
+                  <input type="text" name="origin" placeholder="Origin Country" required>
+                </label>
+                <label>
+                  Destination Country
+                  <input type="text" name="destination" placeholder="Destination Country" required>
+                </label>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Weight (kg)
+                  <input type="number" name="weight" placeholder="Weight in kg">
+                </label>
+                <label>
+                  Freight Mode
+                  <select name="mode">
+                    <option>Air Freight</option>
+                    <option>Sea Freight</option>
+                    <option>Road Delivery</option>
+                  </select>
+                </label>
+              </div>
+
+              <label>
+                Cargo Details
+                <textarea name="notes" placeholder="Describe the goods, urgency, dimensions, and any special handling requirements"></textarea>
+              </label>
+
+              <button type="submit">Submit Request</button>
+            </form>
+
+            <div class="result-box" id="quoteResult"></div>
+          </article>
+
+          <article class="quote-card">
+            <h3>What helps us quote faster</h3>
+            <p>
+              Accurate shipment details make pricing, routing, and timelines
+              easier to confirm from the beginning.
+            </p>
+            <ul class="list">
+              <li>Preferred freight mode if known</li>
+              <li>Pickup city and final delivery point</li>
+              <li>Approximate cargo weight or volume</li>
+              <li>Commercial invoice or cargo description</li>
+              <li>Required delivery timeline</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-card footer-grid">
+        <div>
+          <strong>Bani Global Logistics Limited</strong>
+          <p>Quote support for imports, exports, and end-to-end cargo planning.</p>
+        </div>
+        <div>
+          <strong>Quick Links</strong>
+          <div class="footer-links">
+            <a href="index.html">Home</a>
+            <a href="about.html">About Us</a>
+            <a href="track.html">Track Shipment</a>
+            <a href="contact.html">Contact</a>
+            <a href="terms.html">Terms & Conditions</a>
+            <a href="privacy.html">Privacy Policy</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <a class="whatsapp-float" href="https://wa.me/254782013236" target="_blank" rel="noopener noreferrer">
+      WhatsApp Us
+    </a>
+
+    <script src="js/script.js"></script>
+  </body>
+</html>
