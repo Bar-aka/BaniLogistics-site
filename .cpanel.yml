@@ -3,15 +3,19 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/ljijjlig/public_html/
     - /bin/cp -R about.html $DEPLOYPATH
-    - /bin/cp -R admin-dashboard.html $DEPLOYPATH
-    - /bin/cp -R client-dashboard.html $DEPLOYPATH
     - /bin/cp -R contact.html $DEPLOYPATH
     - /bin/cp -R index.html $DEPLOYPATH
     - /bin/cp -R privacy.html $DEPLOYPATH
     - /bin/cp -R quote.html $DEPLOYPATH
-    - /bin/cp -R staff-dashboard.html $DEPLOYPATH
     - /bin/cp -R terms.html $DEPLOYPATH
     - /bin/cp -R track.html $DEPLOYPATH
+    - /bin/cp -R auth.php $DEPLOYPATH
+    - /bin/cp -R login.php $DEPLOYPATH
+    - /bin/cp -R logout.php $DEPLOYPATH
+    - /bin/cp -R client-dashboard.php $DEPLOYPATH
+    - /bin/cp -R staff-dashboard.php $DEPLOYPATH
+    - /bin/cp -R admin-dashboard.php $DEPLOYPATH
     - /bin/cp -R css $DEPLOYPATH
     - /bin/cp -R js $DEPLOYPATH
     - /bin/cp -R images $DEPLOYPATH
+
