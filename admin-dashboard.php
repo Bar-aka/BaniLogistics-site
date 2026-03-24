@@ -2,7 +2,24 @@
 declare(strict_types=1);
 require_once __DIR__ . '/auth.php';
 bani_require_role('admin');
+
+$accountMessage = '';
+$accountError = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $accountEmail = (string) ($_POST['account_email'] ?? '');
+    $accountStatus = (string) ($_POST['account_status'] ?? '');
+
+    if (bani_update_user_status($accountEmail, $accountStatus)) {
+        $accountMessage = 'Account status updated successfully.';
+    } else {
+        $accountError = 'Unable to update that account status.';
+    }
+}
+
 $user = bani_current_user();
+$userCounts = bani_user_counts();
+$clientAccounts = bani_list_users('client');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -49,9 +66,9 @@ $user = bani_current_user();
 
       <section class="dashboard-stats">
         <article class="dashboard-stat"><strong>KES 4.2M</strong><span>Monthly billed volume</span></article>
-        <article class="dashboard-stat"><strong>27</strong><span>Active customers</span></article>
-        <article class="dashboard-stat"><strong>41</strong><span>Open shipments</span></article>
-        <article class="dashboard-stat"><strong>87%</strong><span>Quote conversion rate</span></article>
+        <article class="dashboard-stat"><strong><?= (int) $userCounts['client'] ?></strong><span>Client accounts</span></article>
+        <article class="dashboard-stat"><strong><?= (int) $userCounts['active'] ?></strong><span>Active system users</span></article>
+        <article class="dashboard-stat"><strong><?= (int) $userCounts['staff'] ?></strong><span>Operations team accounts</span></article>
       </section>
 
       <section class="dashboard-grid">
@@ -78,6 +95,50 @@ $user = bani_current_user();
             <div class="timeline-item"><strong>Resolve three delayed import files</strong><p>Operations to clear documentation blockers before noon.</p></div>
             <div class="timeline-item"><strong>Review quote response speed</strong><p>Average turnaround improved, but same-day target still needs tightening.</p></div>
           </div>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card">
+          <h2>Client Account Management</h2>
+          <p class="dashboard-subtitle">Manage customer access, registration volume, and account status from one control point.</p>
+          <?php if ($accountError !== ''): ?>
+            <div class="result-box show"><strong>Update failed.</strong><p><?= htmlspecialchars($accountError, ENT_QUOTES, 'UTF-8') ?></p></div>
+          <?php endif; ?>
+          <?php if ($accountMessage !== ''): ?>
+            <div class="result-box show"><strong>Update completed.</strong><p><?= htmlspecialchars($accountMessage, ENT_QUOTES, 'UTF-8') ?></p></div>
+          <?php endif; ?>
+          <table class="dashboard-table">
+            <thead>
+              <tr><th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              <?php foreach ($clientAccounts as $account): ?>
+                <tr>
+                  <td><?= htmlspecialchars((string) ($account['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                  <td><?= htmlspecialchars((string) ($account['company'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                  <td><?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                  <td><span class="badge <?= ($account['status'] ?? 'active') === 'active' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($account['status'] ?? 'active'), ENT_QUOTES, 'UTF-8') ?></span></td>
+                  <td>
+                    <form method="post" action="admin-dashboard.php" class="inline-actions">
+                      <input type="hidden" name="account_email" value="<?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                      <input type="hidden" name="account_status" value="<?= ($account['status'] ?? 'active') === 'active' ? 'suspended' : 'active' ?>">
+                      <button type="submit"><?= ($account['status'] ?? 'active') === 'active' ? 'Suspend' : 'Activate' ?></button>
+                    </form>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </article>
+
+        <article class="dashboard-card">
+          <h3>Access Summary</h3>
+          <ul class="dashboard-list">
+            <li><span>Total Accounts<br><small>All roles across the system</small></span><span><?= (int) $userCounts['total'] ?></span></li>
+            <li><span>Client Accounts<br><small>Customer portal registrations</small></span><span><?= (int) $userCounts['client'] ?></span></li>
+            <li><span>Suspended Accounts<br><small>Temporarily blocked access</small></span><span><?= (int) $userCounts['suspended'] ?></span></li>
+          </ul>
         </article>
       </section>
 

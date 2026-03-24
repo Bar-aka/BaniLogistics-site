@@ -13,6 +13,7 @@ $labels = [
 ];
 
 $error = '';
+$success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = $_POST['email'] ?? '';
@@ -20,12 +21,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role = $_POST['role'] ?? 'client';
     $role = in_array($role, $allowedRoles, true) ? $role : 'client';
 
-    if (bani_login($email, $password, $role)) {
+    $result = bani_login($email, $password, $role);
+
+    if (($result['success'] ?? false) === true) {
         header('Location: ' . bani_dashboard_url($role));
         exit;
     }
 
-    $error = 'Invalid login details. Please confirm your email, password, and role.';
+    $error = (string) ($result['message'] ?? 'Unable to sign in.');
 }
 
 $currentUser = bani_current_user();
@@ -106,17 +109,20 @@ if ($currentUser) {
             </div>
             <button type="submit">Sign In</button>
           </form>
+          <p class="dashboard-subtitle" style="margin-top:18px;">
+            New customer? <a href="register.php">Create a client portal account</a>.
+          </p>
         </article>
 
         <article class="dashboard-card">
           <h3>Access Guide</h3>
           <ul class="dashboard-list">
-            <li><span>Client Access<br><small>client@banilogistics.co.ke</small></span><span class="badge badge-blue">Portal</span></li>
-            <li><span>Staff Access<br><small>ops@banilogistics.co.ke</small></span><span class="badge badge-gold">Ops</span></li>
-            <li><span>Admin Access<br><small>admin@banilogistics.co.ke</small></span><span class="badge badge-green">Control</span></li>
+            <li><span>Client Access<br><small>Registered customers can sign in here</small></span><span class="badge badge-blue">Portal</span></li>
+            <li><span>Staff Access<br><small>Internal team credentials</small></span><span class="badge badge-gold">Ops</span></li>
+            <li><span>Admin Access<br><small>Management credentials</small></span><span class="badge badge-green">Control</span></li>
           </ul>
           <p class="dashboard-subtitle" style="margin-top:18px;">
-            Default access credentials are configured for immediate system use and can be updated to match your internal team accounts.
+            Customers can register directly for portal access, while staff and admin accounts are maintained internally.
           </p>
         </article>
       </section>
