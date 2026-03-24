@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Login | Bani Global Logistics Limited</title>
+    <meta name="description" content="Portal login for clients, staff, and administrators.">
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body class="dashboard-page">
+    <header class="site-header">
+      <div class="nav-wrap">
+        <a class="brand" href="index.html" aria-label="Bani Global Logistics Limited home">
+          <img src="images/logo.png" alt="Bani Global Logistics Limited Logo">
+        </a>
+        <nav class="site-nav" aria-label="Main navigation">
+          <a href="index.html">Home</a>
+          <a href="about.html">About</a>
+          <a href="quote.html">Request Quote</a>
+          <a href="track.html">Track Shipment</a>
+          <a class="active" href="login.html">Portal Login</a>
+          <a href="contact.html">Contact</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="dashboard-shell">
+      <section class="dashboard-hero">
+        <div>
+          <div class="eyebrow">Secure portal access</div>
+          <h1>Sign in to the right workspace.</h1>
+          <p>
+            Use this login page to access the client portal, staff workspace, or
+            admin dashboard through a single structured access point for the Bani system.
+          </p>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card">
+          <h2>Portal Login</h2>
+          <p class="dashboard-subtitle">Choose a role and continue to the correct dashboard.</p>
+          <form id="portalLoginForm">
+            <div class="form-grid">
+              <label>
+                Email Address
+                <input type="email" id="loginEmail" placeholder="you@example.com" required>
+              </label>
+              <label>
+                Role
+                <select id="loginRole" required>
+                  <option value="client">Client</option>
+                  <option value="staff">Staff</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-grid">
+              <label>
+                Password
+                <input type="password" id="loginPassword" placeholder="Enter password" required>
+              </label>
+              <label>
+                Portal Destination
+                <input type="text" id="loginDestination" value="Client Portal" readonly>
+              </label>
+            </div>
+            <button type="submit">Sign In</button>
+          </form>
+          <div class="result-box" id="loginResult"></div>
+        </article>
+
+        <article class="dashboard-card">
+          <h3>Access Guide</h3>
+          <ul class="dashboard-list">
+            <li><span>Client Access<br><small>Use any client email address</small></span><span class="badge badge-blue">Portal</span></li>
+            <li><span>Staff Access<br><small>Operations or support team login</small></span><span class="badge badge-gold">Ops</span></li>
+            <li><span>Admin Access<br><small>Leadership or supervisor login</small></span><span class="badge badge-green">Control</span></li>
+          </ul>
+          <p class="dashboard-subtitle" style="margin-top:18px;">
+            Login creates a secure browser session and routes each user to the appropriate workspace based on role.
+          </p>
+        </article>
+      </section>
+    </main>
+
+    <a class="whatsapp-float" href="https://wa.me/254782013236" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+    <script src="js/script.js"></script>
+  </body>
+</html>
