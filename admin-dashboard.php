@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $user = bani_current_user();
 $userCounts = bani_user_counts();
 $clientAccounts = bani_list_users('client');
+$storageMode = bani_db_ready() && bani_db() instanceof PDO ? 'MySQL Database' : 'Local Account Storage';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -110,7 +111,7 @@ $clientAccounts = bani_list_users('client');
           <?php endif; ?>
           <table class="dashboard-table">
             <thead>
-              <tr><th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Action</th></tr>
+              <tr><th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Created</th><th>Last Login</th><th>Action</th></tr>
             </thead>
             <tbody>
               <?php foreach ($clientAccounts as $account): ?>
@@ -119,6 +120,8 @@ $clientAccounts = bani_list_users('client');
                   <td><?= htmlspecialchars((string) ($account['company'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                   <td><?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                   <td><span class="badge <?= ($account['status'] ?? 'active') === 'active' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($account['status'] ?? 'active'), ENT_QUOTES, 'UTF-8') ?></span></td>
+                  <td><?= htmlspecialchars(bani_format_datetime($account['created_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
+                  <td><?= htmlspecialchars(bani_format_datetime($account['last_login_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
                   <td>
                     <form method="post" action="admin-dashboard.php" class="inline-actions">
                       <input type="hidden" name="account_email" value="<?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
@@ -138,6 +141,8 @@ $clientAccounts = bani_list_users('client');
             <li><span>Total Accounts<br><small>All roles across the system</small></span><span><?= (int) $userCounts['total'] ?></span></li>
             <li><span>Client Accounts<br><small>Customer portal registrations</small></span><span><?= (int) $userCounts['client'] ?></span></li>
             <li><span>Suspended Accounts<br><small>Temporarily blocked access</small></span><span><?= (int) $userCounts['suspended'] ?></span></li>
+            <li><span>Latest Registration<br><small>Most recent client account created</small></span><span><?= htmlspecialchars(isset($clientAccounts[0]) ? bani_format_datetime($clientAccounts[array_key_last($clientAccounts)]['created_at'] ?? null) : 'Not available', ENT_QUOTES, 'UTF-8') ?></span></li>
+            <li><span>Storage Mode<br><small>Current account backend in use</small></span><span><?= htmlspecialchars($storageMode, ENT_QUOTES, 'UTF-8') ?></span></li>
           </ul>
         </article>
       </section>

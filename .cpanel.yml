@@ -3,8 +3,11 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/ljijjlig/public_html/
     - /bin/cp -R about.html $DEPLOYPATH
+    - /bin/cp -R config.php $DEPLOYPATH
     - /bin/cp -R contact.html $DEPLOYPATH
+    - /bin/cp -R database.sql $DEPLOYPATH
     - /bin/cp -R index.html $DEPLOYPATH
+    - /bin/cp -R migrate-users.php $DEPLOYPATH
     - /bin/cp -R privacy.html $DEPLOYPATH
     - /bin/cp -R quote.html $DEPLOYPATH
     - /bin/cp -R register.php $DEPLOYPATH

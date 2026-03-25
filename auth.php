@@ -5,6 +5,8 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
+require_once __DIR__ . '/config.php';
+
 const BANI_ALLOWED_ROLES = ['client', 'staff', 'admin'];
 const BANI_ALLOWED_STATUSES = ['active', 'suspended'];
 
@@ -18,28 +20,9 @@ function bani_users_path(): string
     return bani_storage_dir() . DIRECTORY_SEPARATOR . 'users.json';
 }
 
-function bani_ensure_storage(): void
-{
-    $storageDir = bani_storage_dir();
-
-    if (!is_dir($storageDir)) {
-        mkdir($storageDir, 0755, true);
-    }
-
-    $htaccessPath = $storageDir . DIRECTORY_SEPARATOR . '.htaccess';
-    if (!is_file($htaccessPath)) {
-        file_put_contents($htaccessPath, "Require all denied\nDeny from all\n");
-    }
-
-    $usersPath = bani_users_path();
-    if (!is_file($usersPath)) {
-        bani_save_users(bani_seed_users());
-    }
-}
-
 function bani_seed_users(): array
 {
-    $now = gmdate('c');
+    $now = gmdate('Y-m-d H:i:s');
 
     return [
         [
@@ -78,19 +61,95 @@ function bani_seed_users(): array
     ];
 }
 
-function bani_load_users(): array
+function bani_normalize_user(array $user): array
+{
+    return [
+        'email' => strtolower(trim((string) ($user['email'] ?? ''))),
+        'name' => trim((string) ($user['name'] ?? '')),
+        'phone' => trim((string) ($user['phone'] ?? '')),
+        'company' => trim((string) ($user['company'] ?? '')),
+        'role' => in_array(($user['role'] ?? ''), BANI_ALLOWED_ROLES, true) ? (string) $user['role'] : 'client',
+        'status' => in_array(($user['status'] ?? ''), BANI_ALLOWED_STATUSES, true) ? (string) $user['status'] : 'active',
+        'password_hash' => (string) ($user['password_hash'] ?? ''),
+        'created_at' => (string) ($user['created_at'] ?? gmdate('Y-m-d H:i:s')),
+        'last_login_at' => $user['last_login_at'] ?? null,
+    ];
+}
+
+function bani_db_ready(): bool
+{
+    return BANI_DB_NAME !== '' && BANI_DB_USER !== '';
+}
+
+function bani_db(): ?PDO
+{
+    static $pdo = false;
+
+    if ($pdo !== false) {
+        return $pdo instanceof PDO ? $pdo : null;
+    }
+
+    if (!bani_db_ready()) {
+        $pdo = null;
+        return null;
+    }
+
+    try {
+        $dsn = sprintf(
+            'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
+            BANI_DB_HOST,
+            BANI_DB_PORT,
+            BANI_DB_NAME
+        );
+
+        $pdo = new PDO($dsn, BANI_DB_USER, BANI_DB_PASS, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+    } catch (Throwable $exception) {
+        $pdo = null;
+    }
+
+    return $pdo instanceof PDO ? $pdo : null;
+}
+
+function bani_ensure_storage(): void
+{
+    $storageDir = bani_storage_dir();
+
+    if (!is_dir($storageDir)) {
+        mkdir($storageDir, 0755, true);
+    }
+
+    $htaccessPath = $storageDir . DIRECTORY_SEPARATOR . '.htaccess';
+    if (!is_file($htaccessPath)) {
+        file_put_contents($htaccessPath, "Require all denied\nDeny from all\n");
+    }
+
+    $usersPath = bani_users_path();
+    if (!is_file($usersPath)) {
+        bani_save_file_users(bani_seed_users());
+    }
+}
+
+function bani_load_file_users(): array
 {
     bani_ensure_storage();
 
     $json = file_get_contents(bani_users_path());
     $users = json_decode($json ?: '[]', true);
 
-    return is_array($users) ? $users : [];
+    if (!is_array($users)) {
+        return [];
+    }
+
+    return array_map('bani_normalize_user', $users);
 }
 
-function bani_save_users(array $users): void
+function bani_save_file_users(array $users): void
 {
-    $json = json_encode(array_values($users), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $normalized = array_map('bani_normalize_user', array_values($users));
+    $json = json_encode($normalized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     file_put_contents(bani_users_path(), $json . PHP_EOL, LOCK_EX);
 }
 
@@ -107,9 +166,71 @@ function bani_find_user_index(string $email, array $users): ?int
     return null;
 }
 
+function bani_load_users(): array
+{
+    $pdo = bani_db();
+
+    if ($pdo instanceof PDO) {
+        $statement = $pdo->query('SELECT email, name, phone, company, role, status, password_hash, created_at, last_login_at FROM portal_users ORDER BY created_at ASC');
+        $rows = $statement->fetchAll();
+
+        return array_map('bani_normalize_user', is_array($rows) ? $rows : []);
+    }
+
+    return bani_load_file_users();
+}
+
+function bani_upsert_db_user(array $user): bool
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO) {
+        return false;
+    }
+
+    $user = bani_normalize_user($user);
+
+    $statement = $pdo->prepare(
+        'INSERT INTO portal_users (email, name, phone, company, role, status, password_hash, created_at, last_login_at)
+         VALUES (:email, :name, :phone, :company, :role, :status, :password_hash, :created_at, :last_login_at)
+         ON DUPLICATE KEY UPDATE
+           name = VALUES(name),
+           phone = VALUES(phone),
+           company = VALUES(company),
+           role = VALUES(role),
+           status = VALUES(status),
+           password_hash = VALUES(password_hash),
+           created_at = VALUES(created_at),
+           last_login_at = VALUES(last_login_at)'
+    );
+
+    return $statement->execute([
+        ':email' => $user['email'],
+        ':name' => $user['name'],
+        ':phone' => $user['phone'],
+        ':company' => $user['company'],
+        ':role' => $user['role'],
+        ':status' => $user['status'],
+        ':password_hash' => $user['password_hash'],
+        ':created_at' => $user['created_at'],
+        ':last_login_at' => $user['last_login_at'],
+    ]);
+}
+
 function bani_find_user(string $email): ?array
 {
-    $users = bani_load_users();
+    $email = strtolower(trim($email));
+    $pdo = bani_db();
+
+    if ($pdo instanceof PDO) {
+        $statement = $pdo->prepare('SELECT email, name, phone, company, role, status, password_hash, created_at, last_login_at FROM portal_users WHERE email = :email LIMIT 1');
+        $statement->execute([':email' => $email]);
+        $row = $statement->fetch();
+
+        return is_array($row) ? bani_normalize_user($row) : null;
+    }
+
+    $users = bani_load_file_users();
     $index = bani_find_user_index($email, $users);
 
     return $index === null ? null : $users[$index];
@@ -117,7 +238,29 @@ function bani_find_user(string $email): ?array
 
 function bani_current_user(): ?array
 {
-    return $_SESSION['bani_user'] ?? null;
+    $user = $_SESSION['bani_user'] ?? null;
+
+    if (!is_array($user) || !isset($user['email'])) {
+        return null;
+    }
+
+    $freshUser = bani_find_user((string) $user['email']);
+    if ($freshUser === null) {
+        return null;
+    }
+
+    $_SESSION['bani_user'] = [
+        'email' => $freshUser['email'],
+        'role' => $freshUser['role'],
+        'name' => $freshUser['name'],
+        'phone' => $freshUser['phone'],
+        'company' => $freshUser['company'],
+        'status' => $freshUser['status'],
+        'created_at' => $freshUser['created_at'],
+        'last_login_at' => $freshUser['last_login_at'],
+    ];
+
+    return $_SESSION['bani_user'];
 }
 
 function bani_dashboard_url(string $role): string
@@ -133,14 +276,11 @@ function bani_dashboard_url(string $role): string
 function bani_login(string $email, string $password, string $role): array
 {
     $email = strtolower(trim($email));
-    $users = bani_load_users();
-    $index = bani_find_user_index($email, $users);
+    $user = bani_find_user($email);
 
-    if ($index === null) {
+    if ($user === null) {
         return ['success' => false, 'message' => 'No account was found with those details.'];
     }
-
-    $user = $users[$index];
 
     if (($user['role'] ?? '') !== $role) {
         return ['success' => false, 'message' => 'The selected role does not match this account.'];
@@ -154,16 +294,32 @@ function bani_login(string $email, string $password, string $role): array
         return ['success' => false, 'message' => 'Invalid email or password.'];
     }
 
-    $users[$index]['last_login_at'] = gmdate('c');
-    bani_save_users($users);
+    $lastLoginAt = gmdate('Y-m-d H:i:s');
+
+    if (bani_db_ready() && bani_db() instanceof PDO) {
+        $updatedUser = $user;
+        $updatedUser['last_login_at'] = $lastLoginAt;
+        bani_upsert_db_user($updatedUser);
+    } else {
+        $users = bani_load_file_users();
+        $index = bani_find_user_index($email, $users);
+        if ($index !== null) {
+            $users[$index]['last_login_at'] = $lastLoginAt;
+            bani_save_file_users($users);
+        }
+    }
+
+    $freshUser = bani_find_user($email) ?? $user;
 
     $_SESSION['bani_user'] = [
-        'email' => $user['email'],
-        'role' => $user['role'],
-        'name' => $user['name'],
-        'phone' => $user['phone'] ?? '',
-        'company' => $user['company'] ?? '',
-        'status' => $user['status'] ?? 'active',
+        'email' => $freshUser['email'],
+        'role' => $freshUser['role'],
+        'name' => $freshUser['name'],
+        'phone' => $freshUser['phone'],
+        'company' => $freshUser['company'],
+        'status' => $freshUser['status'],
+        'created_at' => $freshUser['created_at'],
+        'last_login_at' => $freshUser['last_login_at'],
     ];
 
     return ['success' => true, 'message' => 'Login successful.'];
@@ -194,12 +350,11 @@ function bani_register_client(array $input): array
         return ['success' => false, 'message' => 'Passwords do not match.'];
     }
 
-    $users = bani_load_users();
-    if (bani_find_user_index($email, $users) !== null) {
+    if (bani_find_user($email) !== null) {
         return ['success' => false, 'message' => 'An account with that email already exists.'];
     }
 
-    $users[] = [
+    $newUser = [
         'email' => $email,
         'name' => $name,
         'phone' => $phone,
@@ -207,11 +362,17 @@ function bani_register_client(array $input): array
         'role' => 'client',
         'status' => 'active',
         'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-        'created_at' => gmdate('c'),
+        'created_at' => gmdate('Y-m-d H:i:s'),
         'last_login_at' => null,
     ];
 
-    bani_save_users($users);
+    if (bani_db_ready() && bani_db() instanceof PDO) {
+        bani_upsert_db_user($newUser);
+    } else {
+        $users = bani_load_file_users();
+        $users[] = $newUser;
+        bani_save_file_users($users);
+    }
 
     return ['success' => true, 'message' => 'Your portal account has been created. You can now sign in.'];
 }
@@ -284,7 +445,18 @@ function bani_update_user_status(string $email, string $status): bool
         return false;
     }
 
-    $users = bani_load_users();
+    $user = bani_find_user($email);
+    if ($user === null) {
+        return false;
+    }
+
+    $user['status'] = $status;
+
+    if (bani_db_ready() && bani_db() instanceof PDO) {
+        return bani_upsert_db_user($user);
+    }
+
+    $users = bani_load_file_users();
     $index = bani_find_user_index($email, $users);
 
     if ($index === null) {
@@ -292,9 +464,24 @@ function bani_update_user_status(string $email, string $status): bool
     }
 
     $users[$index]['status'] = $status;
-    bani_save_users($users);
+    bani_save_file_users($users);
 
     return true;
+}
+
+function bani_format_datetime(?string $value): string
+{
+    if ($value === null || trim($value) === '') {
+        return 'Not available';
+    }
+
+    $timestamp = strtotime($value);
+
+    if ($timestamp === false) {
+        return 'Not available';
+    }
+
+    return date('d M Y, h:i A', $timestamp);
 }
 
 bani_ensure_storage();

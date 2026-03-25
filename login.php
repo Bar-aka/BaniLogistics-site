@@ -82,6 +82,23 @@ if ($currentUser) {
           <?php if ($error !== ''): ?>
             <div class="result-box show"><strong>Login failed.</strong><p><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p></div>
           <?php endif; ?>
+          <div class="portal-grid" style="margin-bottom: 18px;">
+            <article class="portal-card" data-role-card="client">
+              <span class="portal-tag">Client</span>
+              <h3>Client Portal</h3>
+              <p>Track shipments, check quotes, and review account activity.</p>
+            </article>
+            <article class="portal-card" data-role-card="staff">
+              <span class="portal-tag">Staff</span>
+              <h3>Staff Workspace</h3>
+              <p>Coordinate operations, customs handling, and delivery milestones.</p>
+            </article>
+            <article class="portal-card" data-role-card="admin">
+              <span class="portal-tag">Admin</span>
+              <h3>Admin Control</h3>
+              <p>Manage users, oversight, and business performance from one place.</p>
+            </article>
+          </div>
           <form method="post" action="login.php?role=<?= htmlspecialchars($role, ENT_QUOTES, 'UTF-8') ?>">
             <div class="form-grid">
               <label>
@@ -90,7 +107,7 @@ if ($currentUser) {
               </label>
               <label>
                 Role
-                <select name="role" required>
+                <select name="role" id="portalRole" required>
                   <option value="client" <?= $role === 'client' ? 'selected' : '' ?>>Client</option>
                   <option value="staff" <?= $role === 'staff' ? 'selected' : '' ?>>Staff</option>
                   <option value="admin" <?= $role === 'admin' ? 'selected' : '' ?>>Admin</option>
@@ -104,7 +121,7 @@ if ($currentUser) {
               </label>
               <label>
                 Portal Destination
-                <input type="text" value="<?= htmlspecialchars($labels[$role], ENT_QUOTES, 'UTF-8') ?>" readonly>
+                <input type="text" id="portalDestination" value="<?= htmlspecialchars($labels[$role], ENT_QUOTES, 'UTF-8') ?>" readonly>
               </label>
             </div>
             <button type="submit">Sign In</button>
@@ -129,5 +146,47 @@ if ($currentUser) {
     </main>
 
     <a class="whatsapp-float" href="https://wa.me/254782013236" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+    <script>
+      (function () {
+        const roleSelect = document.getElementById("portalRole");
+        const destinationInput = document.getElementById("portalDestination");
+        const roleCards = document.querySelectorAll("[data-role-card]");
+        const labels = {
+          client: "Client Portal",
+          staff: "Staff Dashboard",
+          admin: "Admin Dashboard"
+        };
+
+        if (!roleSelect || !destinationInput) {
+          return;
+        }
+
+        const syncDestination = function () {
+          destinationInput.value = labels[roleSelect.value] || "Client Portal";
+          roleCards.forEach(function (card) {
+            const isActive = card.getAttribute("data-role-card") === roleSelect.value;
+            card.style.borderColor = isActive ? "rgba(27, 116, 228, 0.45)" : "rgba(17, 17, 17, 0.08)";
+            card.style.boxShadow = isActive ? "0 18px 34px rgba(27, 116, 228, 0.16)" : "";
+            card.style.transform = isActive ? "translateY(-2px)" : "";
+          });
+        };
+
+        roleCards.forEach(function (card) {
+          card.style.cursor = "pointer";
+          card.addEventListener("click", function () {
+            const nextRole = card.getAttribute("data-role-card");
+            if (!nextRole) {
+              return;
+            }
+
+            roleSelect.value = nextRole;
+            syncDestination();
+          });
+        });
+
+        roleSelect.addEventListener("change", syncDestination);
+        syncDestination();
+      }());
+    </script>
   </body>
 </html>

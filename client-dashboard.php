@@ -83,6 +83,17 @@ $user = bani_current_user();
 
       <section class="dashboard-mini-grid">
         <article class="dashboard-card">
+          <h3>Account Profile</h3>
+          <ul class="dashboard-list">
+            <li><span>Account Name<br><small>Registered portal identity</small></span><span><?= htmlspecialchars((string) ($user['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <li><span>Company<br><small>Business profile on record</small></span><span><?= htmlspecialchars((string) ($user['company'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <li><span>Phone Number<br><small>Primary contact line</small></span><span><?= htmlspecialchars((string) ($user['phone'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <li><span>Portal Status<br><small>Current access standing</small></span><span class="badge <?= (($user['status'] ?? 'active') === 'active') ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($user['status'] ?? 'active'), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <li><span>Registered On<br><small>Account creation date</small></span><span><?= htmlspecialchars(bani_format_datetime($user['created_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <li><span>Last Login<br><small>Most recent portal access</small></span><span><?= htmlspecialchars(bani_format_datetime($user['last_login_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></span></li>
+          </ul>
+        </article>
+        <article class="dashboard-card">
           <h3>Open Quotes</h3>
           <ul class="dashboard-list">
             <li><span>Q-1184<br><small>Air freight to Nairobi</small></span><span class="badge badge-blue">Pending</span></li>

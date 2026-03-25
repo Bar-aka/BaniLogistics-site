@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/auth.php';
 bani_require_role('staff');
 $user = bani_current_user();
+$clientAccounts = array_slice(array_reverse(bani_list_users('client')), 0, 5);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -81,6 +82,20 @@ $user = bani_current_user();
       </section>
 
       <section class="dashboard-mini-grid">
+        <article class="dashboard-card">
+          <h3>Recent Client Accounts</h3>
+          <ul class="dashboard-list">
+            <?php foreach ($clientAccounts as $account): ?>
+              <li>
+                <span>
+                  <?= htmlspecialchars((string) ($account['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
+                  <small><?= htmlspecialchars((string) ($account['company'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
+                </span>
+                <span class="badge <?= ($account['status'] ?? 'active') === 'active' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($account['status'] ?? 'active'), ENT_QUOTES, 'UTF-8') ?></span>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        </article>
         <article class="dashboard-card">
           <h3>Clearance Board</h3>
           <ul class="dashboard-list">
