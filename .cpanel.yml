@@ -17,6 +17,7 @@ deployment:
     - /bin/cp -R login.html $DEPLOYPATH
     - /bin/cp -R login.php $DEPLOYPATH
     - /bin/cp -R logout.php $DEPLOYPATH
+    - /bin/cp -R portal-data.php $DEPLOYPATH
     - /bin/cp -R client-dashboard.php $DEPLOYPATH
     - /bin/cp -R staff-dashboard.php $DEPLOYPATH
     - /bin/cp -R admin-dashboard.php $DEPLOYPATH

@@ -1,8 +1,13 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/portal-data.php';
 bani_require_role('client');
 $user = bani_current_user();
+$shipments = bani_fetch_shipments((string) ($user['email'] ?? ''), 10);
+$quotes = bani_fetch_quotes((string) ($user['email'] ?? ''), 10);
+$invoices = bani_fetch_invoices((string) ($user['email'] ?? ''), 10);
+$summary = bani_client_summary((string) ($user['email'] ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -37,8 +42,8 @@ $user = bani_current_user();
           <div class="eyebrow">Client dashboard</div>
           <h1>Manage shipments, quotes, and invoices in one workspace.</h1>
           <p>
-            Signed in as <strong><?= htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8') ?></strong>
-            (<?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?>). Review cargo progress,
+            Signed in as <strong><?= htmlspecialchars((string) ($user['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
+            (<?= htmlspecialchars((string) ($user['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>). Review cargo progress,
             invoice status, quote history, and milestone visibility from one secure portal.
           </p>
         </div>
@@ -49,10 +54,10 @@ $user = bani_current_user();
       </section>
 
       <section class="dashboard-stats">
-        <article class="dashboard-stat"><strong>04</strong><span>Active shipments</span></article>
-        <article class="dashboard-stat"><strong>02</strong><span>Open quotes</span></article>
-        <article class="dashboard-stat"><strong>KES 184K</strong><span>Outstanding invoices</span></article>
-        <article class="dashboard-stat"><strong>96%</strong><span>On-time milestone rate</span></article>
+        <article class="dashboard-stat"><strong><?= (int) $summary['shipments'] ?></strong><span>Active shipments</span></article>
+        <article class="dashboard-stat"><strong><?= (int) $summary['quotes'] ?></strong><span>Open quotes</span></article>
+        <article class="dashboard-stat"><strong>KES <?= number_format((float) $summary['outstanding'], 2) ?></strong><span>Outstanding invoices</span></article>
+        <article class="dashboard-stat"><strong><?= (int) $summary['invoices'] ?></strong><span>Invoice records</span></article>
       </section>
 
       <section class="dashboard-grid">
@@ -64,19 +69,37 @@ $user = bani_current_user();
               <tr><th>Reference</th><th>Route</th><th>Status</th><th>Next Step</th></tr>
             </thead>
             <tbody>
-              <tr><td>BANI123</td><td>Guangzhou to Nairobi</td><td><span class="badge badge-blue">In Transit</span></td><td>Arrival scan at destination hub</td></tr>
-              <tr><td>BANI456</td><td>Dubai to Mombasa</td><td><span class="badge badge-gold">Customs</span></td><td>Awaiting clearance release</td></tr>
-              <tr><td>BANI789</td><td>Nairobi station to Westlands</td><td><span class="badge badge-green">Out for Delivery</span></td><td>Customer handoff confirmation</td></tr>
+              <?php if ($shipments === []): ?>
+                <tr><td colspan="4">No shipment records are available for this account yet.</td></tr>
+              <?php else: ?>
+                <?php foreach (array_slice($shipments, 0, 6) as $shipment): ?>
+                  <tr>
+                    <td><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) (($shipment['origin'] ?? '') . ' to ' . ($shipment['destination'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><span class="badge <?= stripos((string) ($shipment['status'] ?? ''), 'customs') !== false ? 'badge-gold' : 'badge-blue' ?>"><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></td>
+                    <td><?= htmlspecialchars((string) ($shipment['next_step'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                  </tr>
+                <?php endforeach; ?>
+              <?php endif; ?>
             </tbody>
           </table>
         </article>
 
         <article class="dashboard-card">
-          <h3>Latest Activity</h3>
+          <h3>Latest Account Activity</h3>
           <div class="timeline">
-            <div class="timeline-item"><strong>Customs documents approved</strong><span>BANI456 • 09:40 AM</span></div>
-            <div class="timeline-item"><strong>Invoice generated</strong><span>INV-2048 • 08:15 AM</span></div>
-            <div class="timeline-item"><strong>Quote response shared</strong><span>Q-1184 • Yesterday</span></div>
+            <?php foreach (array_slice($shipments, 0, 2) as $shipment): ?>
+              <div class="timeline-item"><strong><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?> status updated</strong><span><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars(bani_format_datetime($shipment['updated_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></span></div>
+            <?php endforeach; ?>
+            <?php foreach (array_slice($quotes, 0, 1) as $quote): ?>
+              <div class="timeline-item"><strong><?= htmlspecialchars((string) ($quote['quote_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> quote available</strong><span><?= htmlspecialchars((string) (($quote['currency'] ?? 'KES') . ' ' . number_format((float) ($quote['amount'] ?? 0), 2) . ' • ' . ($quote['status'] ?? '')), ENT_QUOTES, 'UTF-8') ?></span></div>
+            <?php endforeach; ?>
+            <?php foreach (array_slice($invoices, 0, 1) as $invoice): ?>
+              <div class="timeline-item"><strong><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> invoice recorded</strong><span>Due <?= htmlspecialchars((string) ($invoice['due_date'] ?? ''), ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></div>
+            <?php endforeach; ?>
+            <?php if ($shipments === [] && $quotes === [] && $invoices === []): ?>
+              <div class="timeline-item"><strong>No activity yet</strong><span>Your shipment, quote, and invoice activity will appear here once records are created.</span></div>
+            <?php endif; ?>
           </div>
         </article>
       </section>
@@ -96,15 +119,23 @@ $user = bani_current_user();
         <article class="dashboard-card">
           <h3>Open Quotes</h3>
           <ul class="dashboard-list">
-            <li><span>Q-1184<br><small>Air freight to Nairobi</small></span><span class="badge badge-blue">Pending</span></li>
-            <li><span>Q-1181<br><small>Sea freight to Mombasa</small></span><span class="badge badge-green">Approved</span></li>
+            <?php foreach (array_slice($quotes, 0, 5) as $quote): ?>
+              <li><span><?= htmlspecialchars((string) ($quote['quote_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) (($quote['origin'] ?? '') . ' to ' . ($quote['destination'] ?? '')), ENT_QUOTES, 'UTF-8') ?></small></span><span class="badge badge-blue"><?= htmlspecialchars((string) ($quote['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <?php endforeach; ?>
+            <?php if ($quotes === []): ?>
+              <li><span>No quotes yet<br><small>Submitted and issued quotes will appear here.</small></span><span class="badge badge-blue">Awaiting</span></li>
+            <?php endif; ?>
           </ul>
         </article>
         <article class="dashboard-card">
           <h3>Invoice Center</h3>
           <ul class="dashboard-list">
-            <li><span>INV-2048<br><small>Shipment handling</small></span><span class="badge badge-red">Due</span></li>
-            <li><span>INV-2039<br><small>Customs support</small></span><span class="badge badge-green">Paid</span></li>
+            <?php foreach (array_slice($invoices, 0, 5) as $invoice): ?>
+              <li><span><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($invoice['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span><span class="badge <?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <?php endforeach; ?>
+            <?php if ($invoices === []): ?>
+              <li><span>No invoices yet<br><small>Billing records will appear here once issued.</small></span><span class="badge badge-blue">Awaiting</span></li>
+            <?php endif; ?>
           </ul>
         </article>
         <article class="dashboard-card">
