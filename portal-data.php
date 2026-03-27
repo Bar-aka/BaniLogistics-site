@@ -153,7 +153,7 @@ function bani_fetch_invoices(?string $clientEmail = null, int $limit = 20): arra
 
     if ($clientEmail !== null) {
         $statement = $pdo->prepare(
-            "SELECT id, client_email, invoice_number, client_name, description, amount, currency, status, due_date, created_at, updated_at
+            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, created_at, updated_at
              FROM portal_invoices
              WHERE client_email = :client_email
              ORDER BY created_at DESC
@@ -162,7 +162,7 @@ function bani_fetch_invoices(?string $clientEmail = null, int $limit = 20): arra
         $statement->execute([':client_email' => strtolower(trim($clientEmail))]);
     } else {
         $statement = $pdo->query(
-            "SELECT id, client_email, invoice_number, client_name, description, amount, currency, status, due_date, created_at, updated_at
+            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, created_at, updated_at
              FROM portal_invoices
              ORDER BY created_at DESC
              LIMIT {$limit}"
@@ -183,7 +183,7 @@ function bani_fetch_invoice_by_id(int $invoiceId): ?array
     }
 
     $statement = $pdo->prepare(
-        'SELECT id, client_email, invoice_number, client_name, description, amount, currency, status, due_date, created_at, updated_at
+        'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, created_at, updated_at
          FROM portal_invoices
          WHERE id = :id
          LIMIT 1'
@@ -242,6 +242,26 @@ function bani_next_reference(string $prefix, string $table, string $column): str
     return sprintf('%s%04d', $prefix, $count + 1);
 }
 
+function bani_next_shipment_reference(): string
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_shipments')) {
+        return 'BG000001';
+    }
+
+    $statement = $pdo->query('SELECT reference FROM portal_shipments ORDER BY id DESC LIMIT 1');
+    $lastReference = $statement->fetchColumn();
+
+    if (!is_string($lastReference) || !preg_match('/^BG(\d{6})$/', $lastReference, $matches)) {
+        return 'BG000001';
+    }
+
+    $nextNumber = ((int) $matches[1]) + 13;
+
+    return 'BG' . str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
+}
+
 function bani_create_shipment(array $input): array
 {
     $pdo = bani_db();
@@ -276,7 +296,7 @@ function bani_create_shipment(array $input): array
         $assignedName = (string) ($staff['name'] ?? $assignedTo);
     }
 
-    $reference = bani_next_reference('BANI', 'portal_shipments', 'reference');
+    $reference = bani_next_shipment_reference();
     $timestamp = gmdate('Y-m-d H:i:s');
 
     $statement = $pdo->prepare(
@@ -471,6 +491,7 @@ function bani_create_invoice(array $input): array
     }
 
     $clientEmail = strtolower(trim((string) ($input['client_email'] ?? '')));
+    $trackingReference = strtoupper(trim((string) ($input['tracking_reference'] ?? '')));
     $description = trim((string) ($input['description'] ?? ''));
     $amount = (float) ($input['amount'] ?? 0);
     $currency = trim((string) ($input['currency'] ?? 'KES'));
@@ -490,14 +511,15 @@ function bani_create_invoice(array $input): array
     $timestamp = gmdate('Y-m-d H:i:s');
 
     $statement = $pdo->prepare(
-        'INSERT INTO portal_invoices (client_email, invoice_number, client_name, description, amount, currency, status, due_date, created_at, updated_at)
-         VALUES (:client_email, :invoice_number, :client_name, :description, :amount, :currency, :status, :due_date, :created_at, :updated_at)'
+        'INSERT INTO portal_invoices (client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, created_at, updated_at)
+         VALUES (:client_email, :invoice_number, :client_name, :tracking_reference, :description, :amount, :currency, :status, :due_date, :created_at, :updated_at)'
     );
 
     $statement->execute([
         ':client_email' => $client['email'],
         ':invoice_number' => $invoiceNumber,
         ':client_name' => $client['name'],
+        ':tracking_reference' => $trackingReference !== '' ? $trackingReference : null,
         ':description' => $description,
         ':amount' => $amount,
         ':currency' => $currency,

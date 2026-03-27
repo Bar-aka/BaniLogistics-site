@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS portal_invoices (
   client_email VARCHAR(190) NOT NULL,
   invoice_number VARCHAR(40) NOT NULL UNIQUE,
   client_name VARCHAR(190) NOT NULL,
+  tracking_reference VARCHAR(40) NULL,
   description VARCHAR(255) NOT NULL,
   amount DECIMAL(12,2) NOT NULL,
   currency VARCHAR(12) NOT NULL DEFAULT 'KES',
@@ -70,3 +71,4 @@ CREATE TABLE IF NOT EXISTS portal_invoices (
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(190) NULL AFTER client_name;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190) NULL AFTER assigned_to;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT NULL AFTER next_step;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS tracking_reference VARCHAR(40) NULL AFTER client_name;

@@ -54,6 +54,7 @@ $emailBody = rawurlencode(
     "Hello " . (string) ($invoice['client_name'] ?? 'Client') . ",\r\n\r\n"
     . "Please find your invoice details below:\r\n"
     . "Invoice Number: " . (string) ($invoice['invoice_number'] ?? '') . "\r\n"
+    . "Tracking Number: " . (string) (($invoice['tracking_reference'] ?? '') !== '' ? $invoice['tracking_reference'] : 'Not linked') . "\r\n"
     . "Description: " . (string) ($invoice['description'] ?? '') . "\r\n"
     . "Amount: " . (string) (($invoice['currency'] ?? 'KES') . ' ' . number_format((float) ($invoice['amount'] ?? 0), 2)) . "\r\n"
     . "Due Date: " . (string) ($invoice['due_date'] ?? '') . "\r\n\r\n"
@@ -120,7 +121,7 @@ $mailtoLink = 'mailto:' . rawurlencode((string) ($deliveryTargets['client_email'
       <?php endif; ?>
 
       <section class="detail-layout">
-        <article class="dashboard-card invoice-document">
+        <article class="dashboard-card invoice-document invoice-watermark">
           <div class="invoice-topline">
             <div>
               <div class="eyebrow">Bani Global Logistics Limited</div>
@@ -146,6 +147,11 @@ $mailtoLink = 'mailto:' . rawurlencode((string) ($deliveryTargets['client_email'
               <p><strong>Bani Global Logistics Limited</strong></p>
               <p>support@banilogistics.co.ke</p>
               <p>+254 782 013 236</p>
+            </div>
+            <div class="detail-panel">
+              <h3>Tracking Reference</h3>
+              <p><strong><?= htmlspecialchars((string) (($invoice['tracking_reference'] ?? '') !== '' ? $invoice['tracking_reference'] : 'Not linked'), ENT_QUOTES, 'UTF-8') ?></strong></p>
+              <p><?= (($invoice['tracking_reference'] ?? '') !== '') ? 'Linked shipment tracking number shown to client and accounts team.' : 'No shipment tracking number was linked to this invoice.' ?></p>
             </div>
           </div>
 
@@ -178,6 +184,10 @@ $mailtoLink = 'mailto:' . rawurlencode((string) ($deliveryTargets['client_email'
             <div class="timeline-item">
               <strong>Subject</strong>
               <p>Invoice <?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> from Bani Global Logistics Limited</p>
+            </div>
+            <div class="timeline-item">
+              <strong>Tracking Number</strong>
+              <p><?= htmlspecialchars((string) (($invoice['tracking_reference'] ?? '') !== '' ? $invoice['tracking_reference'] : 'Not linked'), ENT_QUOTES, 'UTF-8') ?></p>
             </div>
             <div class="timeline-item">
               <strong>To</strong>

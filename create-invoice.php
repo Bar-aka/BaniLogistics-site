@@ -96,6 +96,10 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin' ? 'admin-dashboard.php' : 'sta
               Invoice Description
               <input type="text" name="description" placeholder="Freight handling and customs support" value="<?= htmlspecialchars((string) ($_POST['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
             </label>
+            <label>
+              Tracking Number
+              <input type="text" name="tracking_reference" placeholder="BG990027" value="<?= htmlspecialchars((string) ($_POST['tracking_reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+            </label>
             <div class="form-grid">
               <label>
                 Amount
@@ -125,6 +129,7 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin' ? 'admin-dashboard.php' : 'sta
           <ul class="dashboard-list">
             <li><span>Primary recipient<br><small>Selected client account email</small></span><span>Client portal</span></li>
             <li><span>Accounts copy<br><small>Internal billing follow-up</small></span><span><?= htmlspecialchars(bani_accounts_email(), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <li><span>Tracking reference<br><small>Optional shipment number on the invoice</small></span><span>Visible on invoice</span></li>
             <li><span>Portal visibility<br><small>Client sees the invoice as soon as it is created</small></span><span>Immediate</span></li>
           </ul>
           <h3>What happens next</h3>
