@@ -47,7 +47,7 @@ function bani_fetch_shipments(?string $clientEmail = null, int $limit = 20): arr
 
     if ($clientEmail !== null) {
         $statement = $pdo->prepare(
-            "SELECT id, client_email, reference, client_name, origin, destination, mode, status, next_step, created_at, updated_at
+            "SELECT id, client_email, reference, client_name, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at
              FROM portal_shipments
              WHERE client_email = :client_email
              ORDER BY created_at DESC
@@ -56,7 +56,7 @@ function bani_fetch_shipments(?string $clientEmail = null, int $limit = 20): arr
         $statement->execute([':client_email' => strtolower(trim($clientEmail))]);
     } else {
         $statement = $pdo->query(
-            "SELECT id, client_email, reference, client_name, origin, destination, mode, status, next_step, created_at, updated_at
+            "SELECT id, client_email, reference, client_name, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at
              FROM portal_shipments
              ORDER BY created_at DESC
              LIMIT {$limit}"
@@ -183,6 +183,7 @@ function bani_create_shipment(array $input): array
     $mode = trim((string) ($input['mode'] ?? ''));
     $status = trim((string) ($input['status'] ?? ''));
     $nextStep = trim((string) ($input['next_step'] ?? ''));
+    $assignedTo = strtolower(trim((string) ($input['assigned_to'] ?? '')));
 
     if ($clientEmail === '' || $origin === '' || $destination === '' || $mode === '' || $status === '' || $nextStep === '') {
         return ['success' => false, 'message' => 'Please complete all shipment fields.'];
@@ -193,28 +194,137 @@ function bani_create_shipment(array $input): array
         return ['success' => false, 'message' => 'Select a valid client account for this shipment.'];
     }
 
+    $assignedName = null;
+    if ($assignedTo !== '') {
+        $staff = bani_find_user($assignedTo);
+        if ($staff === null || !in_array((string) ($staff['role'] ?? ''), ['staff', 'admin'], true)) {
+            return ['success' => false, 'message' => 'Select a valid staff or admin account for assignment.'];
+        }
+        $assignedName = (string) ($staff['name'] ?? $assignedTo);
+    }
+
     $reference = bani_next_reference('BANI', 'portal_shipments', 'reference');
     $timestamp = gmdate('Y-m-d H:i:s');
 
     $statement = $pdo->prepare(
-        'INSERT INTO portal_shipments (client_email, reference, client_name, origin, destination, mode, status, next_step, created_at, updated_at)
-         VALUES (:client_email, :reference, :client_name, :origin, :destination, :mode, :status, :next_step, :created_at, :updated_at)'
+        'INSERT INTO portal_shipments (client_email, reference, client_name, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at)
+         VALUES (:client_email, :reference, :client_name, :assigned_to, :assigned_name, :origin, :destination, :mode, :status, :next_step, :internal_notes, :created_at, :updated_at)'
     );
 
     $statement->execute([
         ':client_email' => $client['email'],
         ':reference' => $reference,
         ':client_name' => $client['name'],
+        ':assigned_to' => $assignedTo !== '' ? $assignedTo : null,
+        ':assigned_name' => $assignedName,
         ':origin' => $origin,
         ':destination' => $destination,
         ':mode' => $mode,
         ':status' => $status,
         ':next_step' => $nextStep,
+        ':internal_notes' => trim((string) ($input['internal_notes'] ?? '')) ?: null,
         ':created_at' => $timestamp,
         ':updated_at' => $timestamp,
     ]);
 
     return ['success' => true, 'message' => "Shipment {$reference} created successfully."];
+}
+
+function bani_update_shipment(int $shipmentId, array $input): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_shipments')) {
+        return ['success' => false, 'message' => 'Shipment storage is not ready yet.'];
+    }
+
+    $statement = $pdo->prepare('SELECT * FROM portal_shipments WHERE id = :id LIMIT 1');
+    $statement->execute([':id' => $shipmentId]);
+    $shipment = $statement->fetch();
+
+    if (!is_array($shipment)) {
+        return ['success' => false, 'message' => 'Shipment record was not found.'];
+    }
+
+    $status = trim((string) ($input['status'] ?? $shipment['status']));
+    $nextStep = trim((string) ($input['next_step'] ?? $shipment['next_step']));
+    $assignedTo = strtolower(trim((string) ($input['assigned_to'] ?? $shipment['assigned_to'] ?? '')));
+    $internalNotes = trim((string) ($input['internal_notes'] ?? $shipment['internal_notes'] ?? ''));
+
+    if ($status === '' || $nextStep === '') {
+        return ['success' => false, 'message' => 'Status and next step are required for shipment updates.'];
+    }
+
+    $assignedName = null;
+    if ($assignedTo !== '') {
+        $staff = bani_find_user($assignedTo);
+        if ($staff === null || !in_array((string) ($staff['role'] ?? ''), ['staff', 'admin'], true)) {
+            return ['success' => false, 'message' => 'Select a valid staff or admin account for shipment assignment.'];
+        }
+        $assignedName = (string) ($staff['name'] ?? $assignedTo);
+    }
+
+    $update = $pdo->prepare(
+        'UPDATE portal_shipments
+         SET assigned_to = :assigned_to,
+             assigned_name = :assigned_name,
+             status = :status,
+             next_step = :next_step,
+             internal_notes = :internal_notes,
+             updated_at = :updated_at
+         WHERE id = :id'
+    );
+
+    $update->execute([
+        ':assigned_to' => $assignedTo !== '' ? $assignedTo : null,
+        ':assigned_name' => $assignedName,
+        ':status' => $status,
+        ':next_step' => $nextStep,
+        ':internal_notes' => $internalNotes !== '' ? $internalNotes : null,
+        ':updated_at' => gmdate('Y-m-d H:i:s'),
+        ':id' => $shipmentId,
+    ]);
+
+    return ['success' => true, 'message' => 'Shipment updated successfully.'];
+}
+
+function bani_update_invoice_status(int $invoiceId, string $status): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_invoices')) {
+        return ['success' => false, 'message' => 'Invoice storage is not ready yet.'];
+    }
+
+    $status = trim($status);
+    if ($status === '') {
+        return ['success' => false, 'message' => 'Invoice status is required.'];
+    }
+
+    $statement = $pdo->prepare('UPDATE portal_invoices SET status = :status, updated_at = :updated_at WHERE id = :id');
+    $statement->execute([
+        ':status' => $status,
+        ':updated_at' => gmdate('Y-m-d H:i:s'),
+        ':id' => $invoiceId,
+    ]);
+
+    return ['success' => true, 'message' => 'Invoice status updated successfully.'];
+}
+
+function bani_staff_users(): array
+{
+    return array_values(array_filter(
+        bani_list_users(),
+        static fn(array $user): bool => in_array((string) ($user['role'] ?? ''), ['staff', 'admin'], true)
+    ));
+}
+
+function bani_count_shipments_by_status(array $shipments, string $needle): int
+{
+    return count(array_filter(
+        $shipments,
+        static fn(array $shipment): bool => stripos((string) ($shipment['status'] ?? ''), $needle) !== false
+    ));
 }
 
 function bani_create_quote(array $input): array

@@ -9,6 +9,35 @@ $shipments = bani_fetch_shipments(null, 8);
 $quotes = bani_fetch_quotes(null, 6);
 $invoices = bani_fetch_invoices(null, 6);
 $shipmentsPending = count(array_filter($shipments, static fn(array $shipment): bool => stripos((string) ($shipment['status'] ?? ''), 'customs') !== false));
+$staffUsers = bani_staff_users();
+$recordMessage = '';
+$recordError = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = (string) ($_POST['action'] ?? '');
+
+    if ($action === 'update-shipment') {
+        $shipmentId = (int) ($_POST['shipment_id'] ?? 0);
+        $result = bani_update_shipment($shipmentId, $_POST);
+        if (($result['success'] ?? false) === true) {
+            $recordMessage = (string) $result['message'];
+            $shipments = bani_fetch_shipments(null, 8);
+            $shipmentsPending = count(array_filter($shipments, static fn(array $shipment): bool => stripos((string) ($shipment['status'] ?? ''), 'customs') !== false));
+        } else {
+            $recordError = (string) ($result['message'] ?? 'Unable to update shipment.');
+        }
+    } elseif ($action === 'update-invoice-status') {
+        $invoiceId = (int) ($_POST['invoice_id'] ?? 0);
+        $invoiceStatus = (string) ($_POST['invoice_status'] ?? '');
+        $result = bani_update_invoice_status($invoiceId, $invoiceStatus);
+        if (($result['success'] ?? false) === true) {
+            $recordMessage = (string) $result['message'];
+            $invoices = bani_fetch_invoices(null, 6);
+        } else {
+            $recordError = (string) ($result['message'] ?? 'Unable to update invoice.');
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -64,6 +93,12 @@ $shipmentsPending = count(array_filter($shipments, static fn(array $shipment): b
         <article class="dashboard-card">
           <h2>Operations Queue</h2>
           <p class="dashboard-subtitle">Priority shipment actions requiring staff attention.</p>
+          <?php if ($recordError !== ''): ?>
+            <div class="result-box show"><strong>Action failed.</strong><p><?= htmlspecialchars($recordError, ENT_QUOTES, 'UTF-8') ?></p></div>
+          <?php endif; ?>
+          <?php if ($recordMessage !== ''): ?>
+            <div class="result-box show"><strong>Action completed.</strong><p><?= htmlspecialchars($recordMessage, ENT_QUOTES, 'UTF-8') ?></p></div>
+          <?php endif; ?>
           <table class="dashboard-table">
             <thead>
               <tr><th>Ref</th><th>Task</th><th>Owner</th><th>Priority</th></tr>
@@ -86,12 +121,36 @@ $shipmentsPending = count(array_filter($shipments, static fn(array $shipment): b
         </article>
 
         <article class="dashboard-card">
-          <h3>Team Notes</h3>
-          <div class="timeline">
-            <div class="timeline-item"><strong>Driver reassigned for Westlands route</strong><p>Last-mile route updated to avoid congestion.</p></div>
-            <div class="timeline-item"><strong>Supplier documents received</strong><p>Commercial invoice and packing list uploaded for customs review.</p></div>
-            <div class="timeline-item"><strong>Customer follow-up requested</strong><p>Support team to confirm ETA on BANI123.</p></div>
-          </div>
+          <h3>Shipment Processing</h3>
+          <table class="dashboard-table">
+            <thead>
+              <tr><th>Reference</th><th>Assigned</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              <?php if ($shipments === []): ?>
+                <tr><td colspan="4">No shipment records are ready for processing yet.</td></tr>
+              <?php else: ?>
+                <?php foreach (array_slice($shipments, 0, 4) as $shipment): ?>
+                  <tr>
+                    <td><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($shipment['assigned_name'] ?? 'Unassigned'), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td>
+                      <form method="post" action="staff-dashboard.php" class="inline-actions">
+                        <input type="hidden" name="action" value="update-shipment">
+                        <input type="hidden" name="shipment_id" value="<?= (int) ($shipment['id'] ?? 0) ?>">
+                        <input type="hidden" name="assigned_to" value="<?= htmlspecialchars((string) ($shipment['assigned_to'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="status" value="<?= stripos((string) ($shipment['status'] ?? ''), 'customs') !== false ? 'Released from Customs' : 'Out for Delivery' ?>">
+                        <input type="hidden" name="next_step" value="<?= stripos((string) ($shipment['status'] ?? ''), 'customs') !== false ? 'Dispatch scheduling after customs release' : 'Final client handoff in progress' ?>">
+                        <input type="hidden" name="internal_notes" value="<?= htmlspecialchars((string) ($shipment['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                        <button type="submit"><?= stripos((string) ($shipment['status'] ?? ''), 'customs') !== false ? 'Release Customs' : 'Advance Status' ?></button>
+                      </form>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </tbody>
+          </table>
         </article>
       </section>
 
@@ -122,13 +181,13 @@ $shipmentsPending = count(array_filter($shipments, static fn(array $shipment): b
           </ul>
         </article>
         <article class="dashboard-card">
-          <h3>Quote Follow-Up</h3>
+          <h3>Assignments</h3>
           <ul class="dashboard-list">
-            <?php foreach (array_slice($quotes, 0, 3) as $quote): ?>
-              <li><span><?= htmlspecialchars((string) ($quote['quote_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) (($quote['origin'] ?? '') . ' to ' . ($quote['destination'] ?? '')), ENT_QUOTES, 'UTF-8') ?></small></span><span><?= htmlspecialchars((string) ($quote['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <?php foreach (array_slice($shipments, 0, 3) as $shipment): ?>
+              <li><span><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($shipment['assigned_name'] ?? 'Unassigned'), ENT_QUOTES, 'UTF-8') ?></small></span><span><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
             <?php endforeach; ?>
-            <?php if ($quotes === []): ?>
-              <li><span>No quotes yet<br><small>Quotes created by admin will appear here.</small></span><span>Pending</span></li>
+            <?php if ($shipments === []): ?>
+              <li><span>No assignments yet<br><small>Assigned shipments will appear here.</small></span><span>Pending</span></li>
             <?php endif; ?>
           </ul>
         </article>
@@ -136,7 +195,15 @@ $shipmentsPending = count(array_filter($shipments, static fn(array $shipment): b
           <h3>Invoice Watchlist</h3>
           <ul class="dashboard-list">
             <?php foreach (array_slice($invoices, 0, 3) as $invoice): ?>
-              <li><span><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($invoice['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span><span class="badge <?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+              <li>
+                <span><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($invoice['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span>
+                <form method="post" action="staff-dashboard.php" class="inline-actions">
+                  <input type="hidden" name="action" value="update-invoice-status">
+                  <input type="hidden" name="invoice_id" value="<?= (int) ($invoice['id'] ?? 0) ?>">
+                  <input type="hidden" name="invoice_status" value="<?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'Due' : 'Paid' ?>">
+                  <button type="submit"><?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'Mark Due' : 'Mark Paid' ?></button>
+                </form>
+              </li>
             <?php endforeach; ?>
             <?php if ($invoices === []): ?>
               <li><span>No invoices yet<br><small>Invoice records will appear here after creation.</small></span><span class="badge badge-blue">Awaiting</span></li>

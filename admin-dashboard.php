@@ -42,6 +42,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $recordError = (string) ($result['message'] ?? 'Unable to create invoice.');
         }
+    } elseif ($action === 'update-shipment') {
+        $shipmentId = (int) ($_POST['shipment_id'] ?? 0);
+        $result = bani_update_shipment($shipmentId, $_POST);
+        if (($result['success'] ?? false) === true) {
+            $recordMessage = (string) $result['message'];
+        } else {
+            $recordError = (string) ($result['message'] ?? 'Unable to update shipment.');
+        }
+    } elseif ($action === 'update-invoice-status') {
+        $invoiceId = (int) ($_POST['invoice_id'] ?? 0);
+        $invoiceStatus = (string) ($_POST['invoice_status'] ?? '');
+        $result = bani_update_invoice_status($invoiceId, $invoiceStatus);
+        if (($result['success'] ?? false) === true) {
+            $recordMessage = (string) $result['message'];
+        } else {
+            $recordError = (string) ($result['message'] ?? 'Unable to update invoice.');
+        }
     }
 }
 
@@ -52,6 +69,14 @@ $storageMode = bani_db_ready() && bani_db() instanceof PDO ? 'MySQL Database' : 
 $shipments = bani_fetch_shipments(null, 8);
 $quotes = bani_fetch_quotes(null, 8);
 $invoices = bani_fetch_invoices(null, 8);
+$staffUsers = bani_staff_users();
+$dueInvoices = count(array_filter($invoices, static fn(array $invoice): bool => strtolower((string) ($invoice['status'] ?? '')) !== 'paid'));
+$paidInvoices = count($invoices) - $dueInvoices;
+$customsShipments = bani_count_shipments_by_status($shipments, 'customs');
+$deliveredShipments = bani_count_shipments_by_status($shipments, 'delivered');
+$outstandingValue = array_reduce($invoices, static function (float $carry, array $invoice): float {
+    return strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? $carry : $carry + (float) ($invoice['amount'] ?? 0);
+}, 0.0);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -97,10 +122,10 @@ $invoices = bani_fetch_invoices(null, 8);
       </section>
 
       <section class="dashboard-stats">
-        <article class="dashboard-stat"><strong>KES 4.2M</strong><span>Monthly billed volume</span></article>
+        <article class="dashboard-stat"><strong>KES <?= number_format($outstandingValue, 2) ?></strong><span>Outstanding invoice value</span></article>
         <article class="dashboard-stat"><strong><?= (int) $userCounts['client'] ?></strong><span>Client accounts</span></article>
-        <article class="dashboard-stat"><strong><?= (int) $userCounts['active'] ?></strong><span>Active system users</span></article>
-        <article class="dashboard-stat"><strong><?= (int) $userCounts['staff'] ?></strong><span>Operations team accounts</span></article>
+        <article class="dashboard-stat"><strong><?= count($shipments) ?></strong><span>Tracked shipments</span></article>
+        <article class="dashboard-stat"><strong><?= $dueInvoices ?></strong><span>Invoices awaiting payment</span></article>
       </section>
 
       <section class="dashboard-grid">
@@ -112,10 +137,10 @@ $invoices = bani_fetch_invoices(null, 8);
               <tr><th>Area</th><th>Current</th><th>Direction</th></tr>
             </thead>
             <tbody>
-              <tr><td>Open Quotes</td><td>13</td><td><span class="badge badge-blue">Steady</span></td></tr>
-              <tr><td>Invoices Due</td><td>KES 184K</td><td><span class="badge badge-gold">Review</span></td></tr>
-              <tr><td>Delayed Shipments</td><td>3</td><td><span class="badge badge-red">Attention</span></td></tr>
-              <tr><td>Cleared Deliveries</td><td>22</td><td><span class="badge badge-green">Healthy</span></td></tr>
+              <tr><td>Open Quotes</td><td><?= count($quotes) ?></td><td><span class="badge badge-blue">Live</span></td></tr>
+              <tr><td>Invoices Due</td><td>KES <?= number_format($outstandingValue, 2) ?></td><td><span class="badge <?= $dueInvoices > 0 ? 'badge-gold' : 'badge-green' ?>"><?= $dueInvoices > 0 ? 'Review' : 'Clear' ?></span></td></tr>
+              <tr><td>Shipments in Customs</td><td><?= $customsShipments ?></td><td><span class="badge <?= $customsShipments > 0 ? 'badge-gold' : 'badge-green' ?>"><?= $customsShipments > 0 ? 'Active' : 'Clear' ?></span></td></tr>
+              <tr><td>Delivered Shipments</td><td><?= $deliveredShipments ?></td><td><span class="badge badge-green">Completed</span></td></tr>
             </tbody>
           </table>
         </article>
@@ -123,9 +148,9 @@ $invoices = bani_fetch_invoices(null, 8);
         <article class="dashboard-card">
           <h3>Leadership Priorities</h3>
           <div class="timeline">
-            <div class="timeline-item"><strong>Follow up overdue invoice queue</strong><p>Accounts to chase 4 customer balances above 14 days.</p></div>
-            <div class="timeline-item"><strong>Resolve three delayed import files</strong><p>Operations to clear documentation blockers before noon.</p></div>
-            <div class="timeline-item"><strong>Review quote response speed</strong><p>Average turnaround improved, but same-day target still needs tightening.</p></div>
+            <div class="timeline-item"><strong><?= $dueInvoices ?> invoices need follow-up</strong><p>Outstanding billing records remain visible until they are marked paid.</p></div>
+            <div class="timeline-item"><strong><?= $customsShipments ?> shipment records are in customs</strong><p>Operations teams can move them forward by updating status and next step.</p></div>
+            <div class="timeline-item"><strong><?= count($quotes) ?> quotes are currently logged</strong><p>Commercial activity is now tied directly to registered client accounts.</p></div>
           </div>
         </article>
       </section>
@@ -165,7 +190,17 @@ $invoices = bani_fetch_invoices(null, 8);
                   <label>Mode<input type="text" name="mode" placeholder="Air Freight" required></label>
                   <label>Status<input type="text" name="status" placeholder="In Transit" required></label>
                 </div>
+                <label>
+                  Assign To
+                  <select name="assigned_to">
+                    <option value="">Unassigned</option>
+                    <?php foreach ($staffUsers as $staffUser): ?>
+                      <option value="<?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($staffUser['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($staffUser['role'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)</option>
+                    <?php endforeach; ?>
+                  </select>
+                </label>
                 <label>Next Step<input type="text" name="next_step" placeholder="Arrival scan at destination hub" required></label>
+                <label>Internal Notes<textarea name="internal_notes" placeholder="Operational handoff notes, customs remarks, or internal instructions"></textarea></label>
                 <button type="submit">Create Shipment</button>
               </form>
             </article>
@@ -232,6 +267,7 @@ $invoices = bani_fetch_invoices(null, 8);
             <li><span>Shipments Logged<br><small>Current stored shipment records</small></span><span><?= count($shipments) ?></span></li>
             <li><span>Quotes Logged<br><small>Current stored quote records</small></span><span><?= count($quotes) ?></span></li>
             <li><span>Invoices Logged<br><small>Current stored invoice records</small></span><span><?= count($invoices) ?></span></li>
+            <li><span>Paid Invoices<br><small>Billing records marked settled</small></span><span><?= $paidInvoices ?></span></li>
           </ul>
         </article>
       </section>
@@ -333,26 +369,72 @@ $invoices = bani_fetch_invoices(null, 8);
 
       <section class="dashboard-mini-grid">
         <article class="dashboard-card">
-          <h3>Team Workload</h3>
-          <ul class="dashboard-list">
-            <li><span>Amina<br><small>Clearance and compliance</small></span><span>7 files</span></li>
-            <li><span>Brian<br><small>Freight coordination</small></span><span>6 files</span></li>
-            <li><span>Mercy<br><small>Delivery operations</small></span><span>5 files</span></li>
-          </ul>
+          <h3>Shipment Processing</h3>
+          <table class="dashboard-table">
+            <thead>
+              <tr><th>Reference</th><th>Assigned</th><th>Status</th><th>Update</th></tr>
+            </thead>
+            <tbody>
+              <?php if ($shipments === []): ?>
+                <tr><td colspan="4">No shipments available for processing yet.</td></tr>
+              <?php else: ?>
+                <?php foreach (array_slice($shipments, 0, 4) as $shipment): ?>
+                  <tr>
+                    <td><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($shipment['assigned_name'] ?? 'Unassigned'), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td>
+                      <form method="post" action="admin-dashboard.php" class="inline-actions">
+                        <input type="hidden" name="action" value="update-shipment">
+                        <input type="hidden" name="shipment_id" value="<?= (int) ($shipment['id'] ?? 0) ?>">
+                        <input type="hidden" name="status" value="Delivered">
+                        <input type="hidden" name="next_step" value="Customer delivery confirmation completed">
+                        <input type="hidden" name="assigned_to" value="<?= htmlspecialchars((string) ($shipment['assigned_to'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="internal_notes" value="<?= htmlspecialchars((string) ($shipment['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                        <button type="submit">Mark Delivered</button>
+                      </form>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </tbody>
+          </table>
         </article>
         <article class="dashboard-card">
-          <h3>Commercial Pipeline</h3>
-          <ul class="dashboard-list">
-            <li><span>Importer accounts<br><small>3 proposals awaiting approval</small></span><span class="badge badge-blue">Open</span></li>
-            <li><span>Export clients<br><small>2 renewals this week</small></span><span class="badge badge-green">Hot</span></li>
-          </ul>
+          <h3>Invoice Actions</h3>
+          <table class="dashboard-table">
+            <thead>
+              <tr><th>Invoice</th><th>Client</th><th>Status</th><th>Update</th></tr>
+            </thead>
+            <tbody>
+              <?php if ($invoices === []): ?>
+                <tr><td colspan="4">No invoices available yet.</td></tr>
+              <?php else: ?>
+                <?php foreach (array_slice($invoices, 0, 4) as $invoice): ?>
+                  <tr>
+                    <td><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($invoice['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td>
+                      <form method="post" action="admin-dashboard.php" class="inline-actions">
+                        <input type="hidden" name="action" value="update-invoice-status">
+                        <input type="hidden" name="invoice_id" value="<?= (int) ($invoice['id'] ?? 0) ?>">
+                        <input type="hidden" name="invoice_status" value="<?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'Due' : 'Paid' ?>">
+                        <button type="submit"><?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'Mark Due' : 'Mark Paid' ?></button>
+                      </form>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </tbody>
+          </table>
         </article>
         <article class="dashboard-card">
-          <h3>Control Center</h3>
+          <h3>Operations Team</h3>
           <ul class="dashboard-list">
-            <li><span>Operations<br><small>ops@banilogistics.co.ke</small></span><span>Live</span></li>
-            <li><span>Accounts<br><small>accounts@banilogistics.co.ke</small></span><span>Billing</span></li>
-            <li><span>Support<br><small>support@banilogistics.co.ke</small></span><span>Follow-ups</span></li>
+            <?php foreach ($staffUsers as $staffUser): ?>
+              <li><span><?= htmlspecialchars((string) ($staffUser['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span><span><?= htmlspecialchars((string) ($staffUser['role'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+            <?php endforeach; ?>
           </ul>
         </article>
       </section>

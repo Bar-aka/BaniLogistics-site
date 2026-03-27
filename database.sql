@@ -19,11 +19,14 @@ CREATE TABLE IF NOT EXISTS portal_shipments (
   client_email VARCHAR(190) NOT NULL,
   reference VARCHAR(40) NOT NULL UNIQUE,
   client_name VARCHAR(190) NOT NULL,
+  assigned_to VARCHAR(190) NULL,
+  assigned_name VARCHAR(190) NULL,
   origin VARCHAR(190) NOT NULL,
   destination VARCHAR(190) NOT NULL,
   mode VARCHAR(80) NOT NULL,
   status VARCHAR(80) NOT NULL,
   next_step VARCHAR(255) NOT NULL,
+  internal_notes TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_portal_shipments_client_email (client_email),
@@ -63,3 +66,7 @@ CREATE TABLE IF NOT EXISTS portal_invoices (
   INDEX idx_portal_invoices_client_email (client_email),
   INDEX idx_portal_invoices_status (status)
 );
+
+ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(190) NULL AFTER client_name;
+ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190) NULL AFTER assigned_to;
+ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT NULL AFTER next_step;
