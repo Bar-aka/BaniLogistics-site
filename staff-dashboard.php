@@ -77,6 +77,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </p>
         </div>
         <div class="dashboard-actions">
+          <a class="button primary" href="create-shipment.php">Create Shipment</a>
+          <a class="button secondary" href="create-invoice.php">Create Invoice</a>
+          <a class="button secondary" href="create-quote.php">Create Quote</a>
+        </div>
+        <div class="dashboard-actions">
           <a class="button primary" href="track.html">Open Tracking Page</a>
           <a class="button secondary" href="contact.html">Support Desk</a>
         </div>
@@ -111,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   <tr>
                     <td><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                     <td><?= htmlspecialchars((string) ($shipment['next_step'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars((string) ($shipment['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($shipment['assigned_name'] ?? 'Unassigned'), ENT_QUOTES, 'UTF-8') ?></td>
                     <td><span class="badge <?= stripos((string) ($shipment['status'] ?? ''), 'customs') !== false ? 'badge-gold' : 'badge-blue' ?>"><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></td>
                   </tr>
                 <?php endforeach; ?>
@@ -196,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <ul class="dashboard-list">
             <?php foreach (array_slice($invoices, 0, 3) as $invoice): ?>
               <li>
-                <span><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($invoice['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span>
+                <span><a href="invoice-view.php?id=<?= (int) ($invoice['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a><br><small><?= htmlspecialchars((string) ($invoice['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span>
                 <form method="post" action="staff-dashboard.php" class="inline-actions">
                   <input type="hidden" name="action" value="update-invoice-status">
                   <input type="hidden" name="invoice_id" value="<?= (int) ($invoice['id'] ?? 0) ?>">

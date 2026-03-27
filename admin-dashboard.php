@@ -21,27 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $accountError = 'Unable to update that account status.';
         }
-    } elseif ($action === 'create-shipment') {
-        $result = bani_create_shipment($_POST);
-        if (($result['success'] ?? false) === true) {
-            $recordMessage = (string) $result['message'];
-        } else {
-            $recordError = (string) ($result['message'] ?? 'Unable to create shipment.');
-        }
-    } elseif ($action === 'create-quote') {
-        $result = bani_create_quote($_POST);
-        if (($result['success'] ?? false) === true) {
-            $recordMessage = (string) $result['message'];
-        } else {
-            $recordError = (string) ($result['message'] ?? 'Unable to create quote.');
-        }
-    } elseif ($action === 'create-invoice') {
-        $result = bani_create_invoice($_POST);
-        if (($result['success'] ?? false) === true) {
-            $recordMessage = (string) $result['message'];
-        } else {
-            $recordError = (string) ($result['message'] ?? 'Unable to create invoice.');
-        }
     } elseif ($action === 'update-shipment') {
         $shipmentId = (int) ($_POST['shipment_id'] ?? 0);
         $result = bani_update_shipment($shipmentId, $_POST);
@@ -116,6 +95,11 @@ $outstandingValue = array_reduce($invoices, static function (float $carry, array
           </p>
         </div>
         <div class="dashboard-actions">
+          <a class="button primary" href="create-invoice.php">Create Invoice</a>
+          <a class="button secondary" href="create-shipment.php">Create Shipment</a>
+          <a class="button secondary" href="create-quote.php">Create Quote</a>
+        </div>
+        <div class="dashboard-actions">
           <a class="button primary" href="staff-dashboard.php">Open Staff Dashboard</a>
           <a class="button secondary" href="client-dashboard.php">Open Client Portal</a>
         </div>
@@ -157,8 +141,8 @@ $outstandingValue = array_reduce($invoices, static function (float $carry, array
 
       <section class="dashboard-grid">
         <article class="dashboard-card">
-          <h2>Operations Record Builder</h2>
-          <p class="dashboard-subtitle">Create shipments, quotes, and invoices linked to registered client accounts.</p>
+          <h2>Operations Workflow</h2>
+          <p class="dashboard-subtitle">Open the dedicated pages for shipments, quotes, and invoices instead of creating everything inside one screen.</p>
           <?php if ($recordError !== ''): ?>
             <div class="result-box show"><strong>Action failed.</strong><p><?= htmlspecialchars($recordError, ENT_QUOTES, 'UTF-8') ?></p></div>
           <?php endif; ?>
@@ -168,95 +152,21 @@ $outstandingValue = array_reduce($invoices, static function (float $carry, array
           <?php if (!bani_records_ready()): ?>
             <div class="result-box show"><strong>Database tables pending.</strong><p>Run the updated SQL schema import first so shipment, quote, and invoice records can be stored.</p></div>
           <?php endif; ?>
-          <div class="dashboard-mini-grid">
-            <article class="dashboard-card">
+          <div class="workflow-grid">
+            <article class="dashboard-card workflow-card">
               <h3>Create Shipment</h3>
-              <form method="post" action="admin-dashboard.php">
-                <input type="hidden" name="action" value="create-shipment">
-                <label>
-                  Client Account
-                  <select name="client_email" required>
-                    <option value="">Select client</option>
-                    <?php foreach ($clientAccounts as $account): ?>
-                      <option value="<?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($account['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($account['company'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)</option>
-                    <?php endforeach; ?>
-                  </select>
-                </label>
-                <div class="form-grid">
-                  <label>Origin<input type="text" name="origin" required></label>
-                  <label>Destination<input type="text" name="destination" required></label>
-                </div>
-                <div class="form-grid">
-                  <label>Mode<input type="text" name="mode" placeholder="Air Freight" required></label>
-                  <label>Status<input type="text" name="status" placeholder="In Transit" required></label>
-                </div>
-                <label>
-                  Assign To
-                  <select name="assigned_to">
-                    <option value="">Unassigned</option>
-                    <?php foreach ($staffUsers as $staffUser): ?>
-                      <option value="<?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($staffUser['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($staffUser['role'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)</option>
-                    <?php endforeach; ?>
-                  </select>
-                </label>
-                <label>Next Step<input type="text" name="next_step" placeholder="Arrival scan at destination hub" required></label>
-                <label>Internal Notes<textarea name="internal_notes" placeholder="Operational handoff notes, customs remarks, or internal instructions"></textarea></label>
-                <button type="submit">Create Shipment</button>
-              </form>
+              <p class="muted">Open a dedicated shipment page to key in routing, assignment, next step, and internal notes.</p>
+              <a class="button primary" href="create-shipment.php">Open Shipment Page</a>
             </article>
-            <article class="dashboard-card">
+            <article class="dashboard-card workflow-card">
               <h3>Create Quote</h3>
-              <form method="post" action="admin-dashboard.php">
-                <input type="hidden" name="action" value="create-quote">
-                <label>
-                  Client Account
-                  <select name="client_email" required>
-                    <option value="">Select client</option>
-                    <?php foreach ($clientAccounts as $account): ?>
-                      <option value="<?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($account['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($account['company'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)</option>
-                    <?php endforeach; ?>
-                  </select>
-                </label>
-                <div class="form-grid">
-                  <label>Shipment Type<input type="text" name="shipment_type" placeholder="Import" required></label>
-                  <label>Mode<input type="text" name="mode" placeholder="Sea Freight" required></label>
-                </div>
-                <div class="form-grid">
-                  <label>Origin<input type="text" name="origin" required></label>
-                  <label>Destination<input type="text" name="destination" required></label>
-                </div>
-                <div class="form-grid">
-                  <label>Amount<input type="number" step="0.01" name="amount" required></label>
-                  <label>Status<input type="text" name="status" placeholder="Pending" required></label>
-                </div>
-                <label>Currency<input type="text" name="currency" value="KES" required></label>
-                <button type="submit">Create Quote</button>
-              </form>
+              <p class="muted">Prepare a client-linked commercial quote on its own page and keep it tied to the same account history.</p>
+              <a class="button primary" href="create-quote.php">Open Quote Page</a>
             </article>
-            <article class="dashboard-card">
+            <article class="dashboard-card workflow-card">
               <h3>Create Invoice</h3>
-              <form method="post" action="admin-dashboard.php">
-                <input type="hidden" name="action" value="create-invoice">
-                <label>
-                  Client Account
-                  <select name="client_email" required>
-                    <option value="">Select client</option>
-                    <?php foreach ($clientAccounts as $account): ?>
-                      <option value="<?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($account['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($account['company'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)</option>
-                    <?php endforeach; ?>
-                  </select>
-                </label>
-                <label>Description<input type="text" name="description" placeholder="Freight handling and customs support" required></label>
-                <div class="form-grid">
-                  <label>Amount<input type="number" step="0.01" name="amount" required></label>
-                  <label>Currency<input type="text" name="currency" value="KES" required></label>
-                </div>
-                <div class="form-grid">
-                  <label>Status<input type="text" name="status" placeholder="Due" required></label>
-                  <label>Due Date<input type="date" name="due_date" required></label>
-                </div>
-                <button type="submit">Create Invoice</button>
-              </form>
+              <p class="muted">Build an invoice, then review the final invoice format and the accounts-team copy route before delivery.</p>
+              <a class="button primary" href="create-invoice.php">Open Invoice Page</a>
             </article>
           </div>
         </article>

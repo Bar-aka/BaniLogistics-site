@@ -68,6 +68,26 @@ function bani_fetch_shipments(?string $clientEmail = null, int $limit = 20): arr
     return is_array($rows) ? $rows : [];
 }
 
+function bani_fetch_shipment_by_id(int $shipmentId): ?array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_shipments') || $shipmentId <= 0) {
+        return null;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT id, client_email, reference, client_name, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at
+         FROM portal_shipments
+         WHERE id = :id
+         LIMIT 1'
+    );
+    $statement->execute([':id' => $shipmentId]);
+    $row = $statement->fetch();
+
+    return is_array($row) ? $row : null;
+}
+
 function bani_fetch_quotes(?string $clientEmail = null, int $limit = 20): array
 {
     $pdo = bani_db();
@@ -99,6 +119,26 @@ function bani_fetch_quotes(?string $clientEmail = null, int $limit = 20): array
     $rows = $statement->fetchAll();
 
     return is_array($rows) ? $rows : [];
+}
+
+function bani_fetch_quote_by_id(int $quoteId): ?array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_quotes') || $quoteId <= 0) {
+        return null;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT id, client_email, quote_number, client_name, shipment_type, origin, destination, mode, amount, currency, status, created_at, updated_at
+         FROM portal_quotes
+         WHERE id = :id
+         LIMIT 1'
+    );
+    $statement->execute([':id' => $quoteId]);
+    $row = $statement->fetch();
+
+    return is_array($row) ? $row : null;
 }
 
 function bani_fetch_invoices(?string $clientEmail = null, int $limit = 20): array
@@ -134,6 +174,26 @@ function bani_fetch_invoices(?string $clientEmail = null, int $limit = 20): arra
     return is_array($rows) ? $rows : [];
 }
 
+function bani_fetch_invoice_by_id(int $invoiceId): ?array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_invoices') || $invoiceId <= 0) {
+        return null;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT id, client_email, invoice_number, client_name, description, amount, currency, status, due_date, created_at, updated_at
+         FROM portal_invoices
+         WHERE id = :id
+         LIMIT 1'
+    );
+    $statement->execute([':id' => $invoiceId]);
+    $row = $statement->fetch();
+
+    return is_array($row) ? $row : null;
+}
+
 function bani_client_summary(string $clientEmail): array
 {
     $shipments = bani_fetch_shipments($clientEmail, 100);
@@ -152,6 +212,19 @@ function bani_client_summary(string $clientEmail): array
         'quotes' => count($quotes),
         'invoices' => count($invoices),
         'outstanding' => $outstanding,
+    ];
+}
+
+function bani_accounts_email(): string
+{
+    return 'accounts@banilogistics.co.ke';
+}
+
+function bani_invoice_delivery_targets(array $invoice): array
+{
+    return [
+        'client_email' => strtolower(trim((string) ($invoice['client_email'] ?? ''))),
+        'accounts_email' => bani_accounts_email(),
     ];
 }
 
@@ -227,7 +300,12 @@ function bani_create_shipment(array $input): array
         ':updated_at' => $timestamp,
     ]);
 
-    return ['success' => true, 'message' => "Shipment {$reference} created successfully."];
+    return [
+        'success' => true,
+        'message' => "Shipment {$reference} created successfully.",
+        'id' => (int) $pdo->lastInsertId(),
+        'reference' => $reference,
+    ];
 }
 
 function bani_update_shipment(int $shipmentId, array $input): array
@@ -376,7 +454,12 @@ function bani_create_quote(array $input): array
         ':updated_at' => $timestamp,
     ]);
 
-    return ['success' => true, 'message' => "Quote {$quoteNumber} created successfully."];
+    return [
+        'success' => true,
+        'message' => "Quote {$quoteNumber} created successfully.",
+        'id' => (int) $pdo->lastInsertId(),
+        'quote_number' => $quoteNumber,
+    ];
 }
 
 function bani_create_invoice(array $input): array
@@ -424,5 +507,10 @@ function bani_create_invoice(array $input): array
         ':updated_at' => $timestamp,
     ]);
 
-    return ['success' => true, 'message' => "Invoice {$invoiceNumber} created successfully."];
+    return [
+        'success' => true,
+        'message' => "Invoice {$invoiceNumber} created successfully.",
+        'id' => (int) $pdo->lastInsertId(),
+        'invoice_number' => $invoiceNumber,
+    ];
 }

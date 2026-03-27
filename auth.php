@@ -399,6 +399,18 @@ function bani_require_role(string $role): void
     }
 }
 
+function bani_require_roles(array $roles, string $redirectRole = 'client'): array
+{
+    $user = bani_current_user();
+
+    if (!$user || !in_array((string) ($user['role'] ?? ''), $roles, true)) {
+        header('Location: login.php?role=' . urlencode($redirectRole));
+        exit;
+    }
+
+    return $user;
+}
+
 function bani_list_users(?string $role = null): array
 {
     $users = bani_load_users();

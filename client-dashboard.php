@@ -1,13 +1,16 @@
 <?php
 declare(strict_types=1);
+
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/portal-data.php';
+
 bani_require_role('client');
 $user = bani_current_user();
-$shipments = bani_fetch_shipments((string) ($user['email'] ?? ''), 10);
-$quotes = bani_fetch_quotes((string) ($user['email'] ?? ''), 10);
-$invoices = bani_fetch_invoices((string) ($user['email'] ?? ''), 10);
-$summary = bani_client_summary((string) ($user['email'] ?? ''));
+$clientEmail = (string) ($user['email'] ?? '');
+$shipments = bani_fetch_shipments($clientEmail, 10);
+$quotes = bani_fetch_quotes($clientEmail, 10);
+$invoices = bani_fetch_invoices($clientEmail, 10);
+$summary = bani_client_summary($clientEmail);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,7 +46,7 @@ $summary = bani_client_summary((string) ($user['email'] ?? ''));
           <h1>Manage shipments, quotes, and invoices in one workspace.</h1>
           <p>
             Signed in as <strong><?= htmlspecialchars((string) ($user['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
-            (<?= htmlspecialchars((string) ($user['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>). Review cargo progress,
+            (<?= htmlspecialchars($clientEmail, ENT_QUOTES, 'UTF-8') ?>). Review cargo progress,
             invoice status, quote history, and milestone visibility from one secure portal.
           </p>
         </div>
@@ -89,13 +92,22 @@ $summary = bani_client_summary((string) ($user['email'] ?? ''));
           <h3>Latest Account Activity</h3>
           <div class="timeline">
             <?php foreach (array_slice($shipments, 0, 2) as $shipment): ?>
-              <div class="timeline-item"><strong><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?> status updated</strong><span><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars(bani_format_datetime($shipment['updated_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></span></div>
+              <div class="timeline-item">
+                <strong><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?> status updated</strong>
+                <span><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars(bani_format_datetime($shipment['updated_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></span>
+              </div>
             <?php endforeach; ?>
             <?php foreach (array_slice($quotes, 0, 1) as $quote): ?>
-              <div class="timeline-item"><strong><?= htmlspecialchars((string) ($quote['quote_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> quote available</strong><span><?= htmlspecialchars((string) (($quote['currency'] ?? 'KES') . ' ' . number_format((float) ($quote['amount'] ?? 0), 2) . ' • ' . ($quote['status'] ?? '')), ENT_QUOTES, 'UTF-8') ?></span></div>
+              <div class="timeline-item">
+                <strong><?= htmlspecialchars((string) ($quote['quote_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> quote available</strong>
+                <span><?= htmlspecialchars((string) (($quote['currency'] ?? 'KES') . ' ' . number_format((float) ($quote['amount'] ?? 0), 2) . ' | ' . ($quote['status'] ?? '')), ENT_QUOTES, 'UTF-8') ?></span>
+              </div>
             <?php endforeach; ?>
             <?php foreach (array_slice($invoices, 0, 1) as $invoice): ?>
-              <div class="timeline-item"><strong><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> invoice recorded</strong><span>Due <?= htmlspecialchars((string) ($invoice['due_date'] ?? ''), ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></div>
+              <div class="timeline-item">
+                <strong><a href="invoice-view.php?id=<?= (int) ($invoice['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a> invoice recorded</strong>
+                <span>Due <?= htmlspecialchars((string) ($invoice['due_date'] ?? ''), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+              </div>
             <?php endforeach; ?>
             <?php if ($shipments === [] && $quotes === [] && $invoices === []): ?>
               <div class="timeline-item"><strong>No activity yet</strong><span>Your shipment, quote, and invoice activity will appear here once records are created.</span></div>
@@ -131,7 +143,7 @@ $summary = bani_client_summary((string) ($user['email'] ?? ''));
           <h3>Invoice Center</h3>
           <ul class="dashboard-list">
             <?php foreach (array_slice($invoices, 0, 5) as $invoice): ?>
-              <li><span><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($invoice['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span><span class="badge <?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+              <li><span><a href="invoice-view.php?id=<?= (int) ($invoice['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a><br><small><?= htmlspecialchars((string) ($invoice['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span><span class="badge <?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
             <?php endforeach; ?>
             <?php if ($invoices === []): ?>
               <li><span>No invoices yet<br><small>Billing records will appear here once issued.</small></span><span class="badge badge-blue">Awaiting</span></li>

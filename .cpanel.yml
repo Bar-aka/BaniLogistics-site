@@ -14,6 +14,10 @@ deployment:
     - /bin/cp -R terms.html $DEPLOYPATH
     - /bin/cp -R track.html $DEPLOYPATH
     - /bin/cp -R auth.php $DEPLOYPATH
+    - /bin/cp -R create-invoice.php $DEPLOYPATH
+    - /bin/cp -R create-quote.php $DEPLOYPATH
+    - /bin/cp -R create-shipment.php $DEPLOYPATH
+    - /bin/cp -R invoice-view.php $DEPLOYPATH
     - /bin/cp -R login.html $DEPLOYPATH
     - /bin/cp -R login.php $DEPLOYPATH
     - /bin/cp -R logout.php $DEPLOYPATH
