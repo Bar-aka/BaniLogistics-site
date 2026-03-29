@@ -110,6 +110,16 @@ $defaultAssigned = ($user['role'] ?? '') === 'staff' ? (string) ($user['email'] 
                 <input type="text" name="status" placeholder="In Transit" value="<?= htmlspecialchars((string) ($_POST['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
               </label>
             </div>
+            <div class="form-grid">
+              <label>
+                Cargo Description
+                <input type="text" name="cargo" placeholder="General cargo" value="<?= htmlspecialchars((string) ($_POST['cargo'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+              </label>
+              <label>
+                Weight
+                <input type="text" name="weight" placeholder="120 kg" value="<?= htmlspecialchars((string) ($_POST['weight'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+              </label>
+            </div>
             <label>
               Assign To
               <select name="assigned_to">
@@ -143,11 +153,21 @@ $defaultAssigned = ($user['role'] ?? '') === 'staff' ? (string) ($user['email'] 
               <li><span>Assigned To<br><small>Operations owner</small></span><span><?= htmlspecialchars((string) ($createdShipment['assigned_name'] ?? 'Unassigned'), ENT_QUOTES, 'UTF-8') ?></span></li>
               <li><span>Status<br><small>Current tracking stage</small></span><span><?= htmlspecialchars((string) ($createdShipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
             </ul>
+            <?php if (isset($result) && is_array($result) && array_key_exists('api_sync', $result)): ?>
+              <div class="result-box show">
+                <strong><?= ($result['api_sync'] ?? false) ? 'Live API sync completed.' : 'Live API sync pending.' ?></strong>
+                <p><?= htmlspecialchars((string) ($result['api_message'] ?? 'No API sync status returned.'), ENT_QUOTES, 'UTF-8') ?></p>
+              </div>
+            <?php endif; ?>
           <?php else: ?>
             <div class="timeline">
               <div class="timeline-item">
                 <strong>Client tracking goes live on creation</strong>
                 <p>The shipment appears in the client portal once this record is saved.</p>
+              </div>
+              <div class="timeline-item">
+                <strong>Optional live API sync</strong>
+                <p>When the Node backend is enabled in config, this same shipment is also mirrored into the production tracking API.</p>
               </div>
               <div class="timeline-item">
                 <strong>Staff workload becomes clearer</strong>

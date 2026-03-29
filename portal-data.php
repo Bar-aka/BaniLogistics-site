@@ -220,12 +220,111 @@ function bani_accounts_email(): string
     return 'accounts@banilogistics.co.ke';
 }
 
+function bani_api_enabled(): bool
+{
+    return defined('BANI_API_BASE')
+        && trim((string) BANI_API_BASE) !== ''
+        && defined('BANI_API_SYNC_SHIPMENTS')
+        && BANI_API_SYNC_SHIPMENTS === true;
+}
+
+function bani_api_post(string $path, array $payload): array
+{
+    if (!bani_api_enabled()) {
+        return ['success' => false, 'message' => 'API sync is disabled.'];
+    }
+
+    $base = rtrim((string) BANI_API_BASE, '/');
+    $url = $base . '/' . ltrim($path, '/');
+    $body = json_encode($payload);
+
+    if ($body === false) {
+        return ['success' => false, 'message' => 'Unable to encode API payload.'];
+    }
+
+    if (function_exists('curl_init')) {
+        $handle = curl_init($url);
+        curl_setopt_array($handle, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Accept: application/json',
+                'Content-Length: ' . strlen($body),
+            ],
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT => 15,
+        ]);
+
+        $response = curl_exec($handle);
+        $error = curl_error($handle);
+        $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        curl_close($handle);
+
+        if ($response === false) {
+            return ['success' => false, 'message' => $error !== '' ? $error : 'Unable to reach API endpoint.'];
+        }
+
+        if ($status < 200 || $status >= 300) {
+            return ['success' => false, 'message' => 'API responded with HTTP ' . $status . '.'];
+        }
+
+        $decoded = json_decode((string) $response, true);
+
+        return [
+            'success' => true,
+            'message' => (string) ($decoded['message'] ?? 'API sync completed.'),
+        ];
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\nAccept: application/json\r\n",
+            'content' => $body,
+            'timeout' => 15,
+        ],
+    ]);
+
+    $response = @file_get_contents($url, false, $context);
+
+    if ($response === false) {
+        return ['success' => false, 'message' => 'Unable to reach API endpoint.'];
+    }
+
+    return ['success' => true, 'message' => 'API sync completed.'];
+}
+
 function bani_invoice_delivery_targets(array $invoice): array
 {
     return [
         'client_email' => strtolower(trim((string) ($invoice['client_email'] ?? ''))),
         'accounts_email' => bani_accounts_email(),
     ];
+}
+
+function bani_sync_shipment_to_api(array $shipment, array $input): array
+{
+    if (!bani_api_enabled()) {
+        return ['success' => false, 'message' => 'API sync is disabled.'];
+    }
+
+    $clientEmail = (string) ($shipment['client_email'] ?? '');
+    $assignedTo = trim((string) ($shipment['assigned_to'] ?? ''));
+    $cargo = trim((string) ($input['cargo'] ?? ''));
+    $weight = trim((string) ($input['weight'] ?? ''));
+
+    return bani_api_post('/api/shipment', [
+        'tracking_number' => (string) ($shipment['reference'] ?? ''),
+        'client_id' => 'CL-' . substr(md5($clientEmail), 0, 10),
+        'origin' => (string) ($shipment['origin'] ?? ''),
+        'destination' => (string) ($shipment['destination'] ?? ''),
+        'cargo' => $cargo !== '' ? $cargo : ((string) ($shipment['internal_notes'] ?? '') !== '' ? (string) ($shipment['internal_notes'] ?? '') : 'Cargo details pending confirmation'),
+        'weight' => $weight !== '' ? $weight : 'Pending',
+        'mode' => (string) ($shipment['mode'] ?? ''),
+        'assigned_to' => $assignedTo !== '' ? 'USR-' . substr(md5($assignedTo), 0, 10) : null,
+    ]);
 }
 
 function bani_next_reference(string $prefix, string $table, string $column): string
@@ -320,12 +419,27 @@ function bani_create_shipment(array $input): array
         ':updated_at' => $timestamp,
     ]);
 
-    return [
+    $result = [
         'success' => true,
         'message' => "Shipment {$reference} created successfully.",
         'id' => (int) $pdo->lastInsertId(),
         'reference' => $reference,
     ];
+
+    if (bani_api_enabled()) {
+        $createdShipment = bani_fetch_shipment_by_id((int) $result['id']);
+
+        if (is_array($createdShipment)) {
+            $apiSync = bani_sync_shipment_to_api($createdShipment, $input);
+            $result['api_sync'] = (bool) ($apiSync['success'] ?? false);
+            $result['api_message'] = (string) ($apiSync['message'] ?? '');
+            $result['message'] .= ($apiSync['success'] ?? false)
+                ? ' Live API sync completed.'
+                : ' Local record saved, but API sync did not complete.';
+        }
+    }
+
+    return $result;
 }
 
 function bani_update_shipment(int $shipmentId, array $input): array

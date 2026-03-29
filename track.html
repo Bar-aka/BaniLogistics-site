@@ -32,8 +32,7 @@
         <div class="eyebrow">Shipment tracking</div>
         <h1>Check cargo status in one place.</h1>
         <p>
-          This page includes a working shipment lookup interface for fast status
-          visibility and a more professional customer experience.
+          This page checks the live tracking system first, then keeps a local fallback in place while the API rollout is being completed.
         </p>
       </section>
 
@@ -53,6 +52,7 @@
               <p id="statusText">
                 Enter a shipment reference to view the latest movement update.
               </p>
+              <p id="statusSource" class="muted">Tracking source will appear after lookup.</p>
               <ul class="list status-list" id="statusDetails">
                 <li>Try BG000001, BG000014, or BG000027</li>
               </ul>
@@ -96,6 +96,9 @@
       WhatsApp Us
     </a>
 
+    <script>
+      window.BANI_API_BASE = window.BANI_API_BASE || "";
+    </script>
     <script src="js/script.js"></script>
   </body>
 </html>
