@@ -194,6 +194,39 @@ function bani_fetch_invoice_by_id(int $invoiceId): ?array
     return is_array($row) ? $row : null;
 }
 
+function bani_fetch_incoming_requests(?string $clientEmail = null, int $limit = 20): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_incoming_requests')) {
+        return [];
+    }
+
+    $limit = max(1, min($limit, 100));
+
+    if ($clientEmail !== null) {
+        $statement = $pdo->prepare(
+            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, notes, created_at, updated_at
+             FROM portal_incoming_requests
+             WHERE client_email = :client_email
+             ORDER BY created_at DESC
+             LIMIT {$limit}"
+        );
+        $statement->execute([':client_email' => strtolower(trim($clientEmail))]);
+    } else {
+        $statement = $pdo->query(
+            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, notes, created_at, updated_at
+             FROM portal_incoming_requests
+             ORDER BY created_at DESC
+             LIMIT {$limit}"
+        );
+    }
+
+    $rows = $statement->fetchAll();
+
+    return is_array($rows) ? $rows : [];
+}
+
 function bani_client_summary(string $clientEmail): array
 {
     $shipments = bani_fetch_shipments($clientEmail, 100);
@@ -218,6 +251,60 @@ function bani_client_summary(string $clientEmail): array
 function bani_accounts_email(): string
 {
     return 'accounts@banilogistics.co.ke';
+}
+
+function bani_create_incoming_request(string $clientEmail, array $input): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_incoming_requests')) {
+        return ['success' => false, 'message' => 'Incoming cargo intake is not ready yet.'];
+    }
+
+    $clientEmail = strtolower(trim($clientEmail));
+    $supplierName = trim((string) ($input['supplier_name'] ?? ''));
+    $supplierTrackingNumber = strtoupper(trim((string) ($input['supplier_tracking_number'] ?? '')));
+    $itemDescription = trim((string) ($input['item_description'] ?? ''));
+    $origin = trim((string) ($input['origin'] ?? ''));
+    $expectedArrival = trim((string) ($input['expected_arrival'] ?? ''));
+    $notes = trim((string) ($input['notes'] ?? ''));
+
+    if ($clientEmail === '' || $supplierName === '' || $supplierTrackingNumber === '' || $itemDescription === '' || $origin === '') {
+        return ['success' => false, 'message' => 'Please complete the supplier, tracking, item, and origin details.'];
+    }
+
+    $client = bani_find_user($clientEmail);
+    if ($client === null || ($client['role'] ?? '') !== 'client') {
+        return ['success' => false, 'message' => 'This client account could not be matched to the portal.'];
+    }
+
+    $statement = $pdo->prepare(
+        'INSERT INTO portal_incoming_requests
+         (client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, notes, created_at, updated_at)
+         VALUES
+         (:client_email, :client_name, :supplier_name, :supplier_tracking_number, :item_description, :origin, :expected_arrival, :status, :notes, :created_at, :updated_at)'
+    );
+
+    $timestamp = gmdate('Y-m-d H:i:s');
+
+    $statement->execute([
+        ':client_email' => $clientEmail,
+        ':client_name' => (string) ($client['name'] ?? $clientEmail),
+        ':supplier_name' => $supplierName,
+        ':supplier_tracking_number' => $supplierTrackingNumber,
+        ':item_description' => $itemDescription,
+        ':origin' => $origin,
+        ':expected_arrival' => $expectedArrival !== '' ? $expectedArrival : null,
+        ':status' => 'Submitted',
+        ':notes' => $notes !== '' ? $notes : null,
+        ':created_at' => $timestamp,
+        ':updated_at' => $timestamp,
+    ]);
+
+    return [
+        'success' => true,
+        'message' => 'Incoming cargo details received. Operations can now align the shipment with supplier tracking updates.',
+    ];
 }
 
 function bani_api_enabled(): bool

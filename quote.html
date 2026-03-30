@@ -6,7 +6,7 @@
     <title>Request Quote | Bani Global Logistics Limited</title>
     <meta
       name="description"
-      content="Request a freight quote from Bani Global Logistics Limited for imports, exports, customs handling, and delivery."
+      content="Request a shipping or sourcing quote from Bani Global Logistics Limited for imports, exports, procurement support, customs handling, and delivery."
     >
     <link rel="stylesheet" href="css/style.css">
   </head>
@@ -30,22 +30,20 @@
     <main>
       <section class="page-hero">
         <div class="eyebrow">Quote request</div>
-        <h1>Tell us about your shipment.</h1>
+        <h1>Choose the type of quote you need.</h1>
         <p>
-          Share your cargo details and route information so we can prepare a
-          professional estimate for your logistics needs.
+          Use the shipping quote when you already know what is moving, and use the sourcing quote when you need help identifying, buying, or consolidating goods before shipment.
         </p>
       </section>
 
       <section class="page-section">
         <div class="page-grid">
           <article class="quote-card">
-            <h3>Request a Quote</h3>
+            <h3>Shipping Quote</h3>
             <p>
-              This form gives your site a polished quote request workflow for
-              customer submissions and freight inquiries.
+              Share your cargo, route, and preferred mode so we can prepare a transport, customs, and handling estimate.
             </p>
-            <form id="quoteForm">
+            <form id="shippingQuoteForm">
               <div class="form-grid">
                 <label>
                   Full Name
@@ -67,6 +65,7 @@
                   <select name="type">
                     <option>Import</option>
                     <option>Export</option>
+                    <option>Transit</option>
                   </select>
                 </label>
               </div>
@@ -102,24 +101,96 @@
                 <textarea name="notes" placeholder="Describe the goods, urgency, dimensions, and any special handling requirements"></textarea>
               </label>
 
-              <button type="submit">Submit Request</button>
+              <button type="submit">Submit Shipping Quote</button>
             </form>
 
-            <div class="result-box" id="quoteResult"></div>
+            <div class="result-box" id="shippingQuoteResult"></div>
           </article>
 
           <article class="quote-card">
-            <h3>What helps us quote faster</h3>
+            <h3>Sourcing Quote</h3>
             <p>
-              Accurate shipment details make pricing, routing, and timelines
-              easier to confirm from the beginning.
+              Use this when you want us to help source the goods before shipping. Share what you need and we will advise on the key specifications required to proceed.
             </p>
+            <form id="sourcingQuoteForm">
+              <div class="form-grid">
+                <label>
+                  Full Name
+                  <input type="text" name="name" placeholder="Full Name" required>
+                </label>
+                <label>
+                  Email Address
+                  <input type="email" name="email" placeholder="Email Address" required>
+                </label>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Phone Number
+                  <input type="text" name="phone" placeholder="Phone Number">
+                </label>
+                <label>
+                  Target Delivery Country
+                  <input type="text" name="destination" placeholder="Delivery Country or City" required>
+                </label>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Product Category
+                  <input type="text" name="product_category" placeholder="Electronics, textiles, machinery, spare parts" required>
+                </label>
+                <label>
+                  Quantity Needed
+                  <input type="text" name="quantity" placeholder="Units, cartons, pallets, sets" required>
+                </label>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Preferred Sourcing Market
+                  <input type="text" name="market" placeholder="China, Turkey, UAE, UK, local, or flexible">
+                </label>
+                <label>
+                  Budget Range
+                  <input type="text" name="budget" placeholder="Budget range or target landed cost">
+                </label>
+              </div>
+
+              <label>
+                Product Details
+                <textarea name="product_details" placeholder="Describe the exact item, brand/specification, model, dimensions, quality grade, color, compliance needs, or links/photos you already have" required></textarea>
+              </label>
+
+              <button type="submit">Submit Sourcing Request</button>
+            </form>
+
+            <div class="result-box" id="sourcingQuoteResult"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page-section">
+        <div class="page-grid">
+          <article class="quote-card">
+            <h3>What helps us quote faster for shipping</h3>
             <ul class="list">
               <li>Preferred freight mode if known</li>
               <li>Pickup city and final delivery point</li>
               <li>Approximate cargo weight or volume</li>
               <li>Commercial invoice or cargo description</li>
               <li>Required delivery timeline</li>
+            </ul>
+          </article>
+
+          <article class="quote-card">
+            <h3>What we need for sourcing requests</h3>
+            <ul class="list">
+              <li>Clear item name, model, or technical specification</li>
+              <li>Quantity and expected quality standard</li>
+              <li>Budget or target landed cost if available</li>
+              <li>Preferred supplier market or country</li>
+              <li>Links, photos, drawings, or brand references where possible</li>
             </ul>
           </article>
         </div>
@@ -130,7 +201,7 @@
       <div class="footer-card footer-grid">
         <div>
           <strong>Bani Global Logistics Limited</strong>
-          <p>Quote support for imports, exports, and end-to-end cargo planning.</p>
+          <p>Quote support for shipping, sourcing, customs brokerage, and end-to-end cargo planning.</p>
         </div>
         <div>
           <strong>Quick Links</strong>

@@ -68,6 +68,23 @@ CREATE TABLE IF NOT EXISTS portal_invoices (
   INDEX idx_portal_invoices_status (status)
 );
 
+CREATE TABLE IF NOT EXISTS portal_incoming_requests (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  client_email VARCHAR(190) NOT NULL,
+  client_name VARCHAR(190) NOT NULL,
+  supplier_name VARCHAR(190) NOT NULL,
+  supplier_tracking_number VARCHAR(120) NOT NULL,
+  item_description TEXT NOT NULL,
+  origin VARCHAR(190) NOT NULL,
+  expected_arrival DATE NULL,
+  status VARCHAR(80) NOT NULL DEFAULT 'Submitted',
+  notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_portal_incoming_requests_client_email (client_email),
+  INDEX idx_portal_incoming_requests_status (status)
+);
+
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(190) NULL AFTER client_name;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190) NULL AFTER assigned_to;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT NULL AFTER next_step;

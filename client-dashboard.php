@@ -7,9 +7,16 @@ require_once __DIR__ . '/portal-data.php';
 bani_require_role('client');
 $user = bani_current_user();
 $clientEmail = (string) ($user['email'] ?? '');
+$incomingResult = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'submit-incoming') {
+    $incomingResult = bani_create_incoming_request($clientEmail, $_POST);
+}
+
 $shipments = bani_fetch_shipments($clientEmail, 10);
 $quotes = bani_fetch_quotes($clientEmail, 10);
 $invoices = bani_fetch_invoices($clientEmail, 10);
+$incomingRequests = bani_fetch_incoming_requests($clientEmail, 10);
 $summary = bani_client_summary($clientEmail);
 ?>
 <!DOCTYPE html>
@@ -60,7 +67,78 @@ $summary = bani_client_summary($clientEmail);
         <article class="dashboard-stat"><strong><?= (int) $summary['shipments'] ?></strong><span>Active shipments</span></article>
         <article class="dashboard-stat"><strong><?= (int) $summary['quotes'] ?></strong><span>Open quotes</span></article>
         <article class="dashboard-stat"><strong>KES <?= number_format((float) $summary['outstanding'], 2) ?></strong><span>Outstanding invoices</span></article>
-        <article class="dashboard-stat"><strong><?= (int) $summary['invoices'] ?></strong><span>Invoice records</span></article>
+        <article class="dashboard-stat"><strong><?= count($incomingRequests) ?></strong><span>Incoming supplier alerts</span></article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card">
+          <h2>Incoming Cargo Intake</h2>
+          <p class="dashboard-subtitle">Share supplier tracking details early so our operations team can prepare receipt, clearance, and delivery follow-up before cargo lands.</p>
+          <?php if (is_array($incomingResult)): ?>
+            <div class="result-box show <?= ($incomingResult['success'] ?? false) ? 'result-success' : 'result-error' ?>">
+              <?= htmlspecialchars((string) ($incomingResult['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+            </div>
+          <?php endif; ?>
+          <form method="post" class="dashboard-intake-form">
+            <input type="hidden" name="action" value="submit-incoming">
+            <div class="form-grid">
+              <label>
+                Supplier Name
+                <input type="text" name="supplier_name" placeholder="Supplier, marketplace, or store name" required>
+              </label>
+              <label>
+                Supplier Tracking Number
+                <input type="text" name="supplier_tracking_number" placeholder="Airway bill, parcel ID, or supplier reference" required>
+              </label>
+            </div>
+            <div class="form-grid">
+              <label>
+                Origin
+                <input type="text" name="origin" placeholder="Origin city or country" required>
+              </label>
+              <label>
+                Expected Arrival
+                <input type="date" name="expected_arrival">
+              </label>
+            </div>
+            <label>
+              Item Description
+              <textarea name="item_description" placeholder="Describe the goods, quantity, packaging, and any special handling details" required></textarea>
+            </label>
+            <label>
+              Extra Notes
+              <textarea name="notes" placeholder="Share supplier contact details, invoice numbers, or customs notes if available"></textarea>
+            </label>
+            <button type="submit">Submit Incoming Details</button>
+          </form>
+        </article>
+
+        <article class="dashboard-card">
+          <h3>Submitted Incoming Details</h3>
+          <ul class="dashboard-list">
+            <?php foreach (array_slice($incomingRequests, 0, 6) as $incoming): ?>
+              <li>
+                <span>
+                  <?= htmlspecialchars((string) ($incoming['supplier_tracking_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
+                  <small>
+                    <?= htmlspecialchars((string) ($incoming['supplier_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                    | <?= htmlspecialchars((string) ($incoming['origin'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                    <?php if (!empty($incoming['expected_arrival'])): ?>
+                      | ETA <?= htmlspecialchars((string) $incoming['expected_arrival'], ENT_QUOTES, 'UTF-8') ?>
+                    <?php endif; ?>
+                  </small>
+                </span>
+                <span class="badge badge-blue"><?= htmlspecialchars((string) ($incoming['status'] ?? 'Submitted'), ENT_QUOTES, 'UTF-8') ?></span>
+              </li>
+            <?php endforeach; ?>
+            <?php if ($incomingRequests === []): ?>
+              <li>
+                <span>No incoming supplier details submitted yet<br><small>Add supplier tracking numbers here so the operations team can monitor what is on the way.</small></span>
+                <span class="badge badge-blue">Awaiting</span>
+              </li>
+            <?php endif; ?>
+          </ul>
+        </article>
       </section>
 
       <section class="dashboard-grid">
@@ -109,8 +187,14 @@ $summary = bani_client_summary($clientEmail);
                 <span>Due <?= htmlspecialchars((string) ($invoice['due_date'] ?? ''), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
               </div>
             <?php endforeach; ?>
-            <?php if ($shipments === [] && $quotes === [] && $invoices === []): ?>
-              <div class="timeline-item"><strong>No activity yet</strong><span>Your shipment, quote, and invoice activity will appear here once records are created.</span></div>
+            <?php foreach (array_slice($incomingRequests, 0, 1) as $incoming): ?>
+              <div class="timeline-item">
+                <strong>Incoming supplier reference logged</strong>
+                <span><?= htmlspecialchars((string) ($incoming['supplier_tracking_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars(bani_format_datetime($incoming['created_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></span>
+              </div>
+            <?php endforeach; ?>
+            <?php if ($shipments === [] && $quotes === [] && $invoices === [] && $incomingRequests === []): ?>
+              <div class="timeline-item"><strong>No activity yet</strong><span>Your shipment, quote, invoice, and incoming-supplier activity will appear here once records are created.</span></div>
             <?php endif; ?>
           </div>
         </article>
@@ -132,7 +216,7 @@ $summary = bani_client_summary($clientEmail);
           <h3>Open Quotes</h3>
           <ul class="dashboard-list">
             <?php foreach (array_slice($quotes, 0, 5) as $quote): ?>
-              <li><span><?= htmlspecialchars((string) ($quote['quote_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) (($quote['origin'] ?? '') . ' to ' . ($quote['destination'] ?? '')), ENT_QUOTES, 'UTF-8') ?></small></span><span class="badge badge-blue"><?= htmlspecialchars((string) ($quote['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+              <li><span><?= htmlspecialchars((string) ($quote['quote_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($quote['shipment_type'] ?? 'Quote'), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars((string) (($quote['origin'] ?? '') . ' to ' . ($quote['destination'] ?? '')), ENT_QUOTES, 'UTF-8') ?></small></span><span class="badge badge-blue"><?= htmlspecialchars((string) ($quote['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
             <?php endforeach; ?>
             <?php if ($quotes === []): ?>
               <li><span>No quotes yet<br><small>Submitted and issued quotes will appear here.</small></span><span class="badge badge-blue">Awaiting</span></li>
