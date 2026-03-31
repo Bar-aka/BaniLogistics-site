@@ -1,7 +1,9 @@
 <?php
 declare(strict_types=1);
+
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/portal-data.php';
+
 bani_require_role('admin');
 
 $accountMessage = '';
@@ -38,6 +40,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $recordError = (string) ($result['message'] ?? 'Unable to update invoice.');
         }
+    } elseif ($action === 'update-incoming-status') {
+        $requestId = (int) ($_POST['request_id'] ?? 0);
+        $incomingStatus = (string) ($_POST['incoming_status'] ?? '');
+        $result = bani_update_incoming_request_status($requestId, $incomingStatus);
+        if (($result['success'] ?? false) === true) {
+            $recordMessage = (string) $result['message'];
+        } else {
+            $recordError = (string) ($result['message'] ?? 'Unable to update incoming cargo request.');
+        }
+    } elseif ($action === 'convert-incoming') {
+        $requestId = (int) ($_POST['request_id'] ?? 0);
+        $result = bani_convert_incoming_request_to_shipment($requestId, $_POST);
+        if (($result['success'] ?? false) === true) {
+            $recordMessage = (string) $result['message'];
+        } else {
+            $recordError = (string) ($result['message'] ?? 'Unable to convert incoming request.');
+        }
     }
 }
 
@@ -45,17 +64,19 @@ $user = bani_current_user();
 $userCounts = bani_user_counts();
 $clientAccounts = bani_list_users('client');
 $storageMode = bani_db_ready() && bani_db() instanceof PDO ? 'MySQL Database' : 'Local Account Storage';
-$shipments = bani_fetch_shipments(null, 8);
+$shipments = bani_fetch_shipments(null, 12);
 $quotes = bani_fetch_quotes(null, 8);
 $invoices = bani_fetch_invoices(null, 8);
+$incomingRequests = bani_fetch_incoming_requests(null, 8);
 $staffUsers = bani_staff_users();
 $dueInvoices = count(array_filter($invoices, static fn(array $invoice): bool => strtolower((string) ($invoice['status'] ?? '')) !== 'paid'));
-$paidInvoices = count($invoices) - $dueInvoices;
 $customsShipments = bani_count_shipments_by_status($shipments, 'customs');
 $deliveredShipments = bani_count_shipments_by_status($shipments, 'delivered');
 $outstandingValue = array_reduce($invoices, static function (float $carry, array $invoice): float {
     return strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? $carry : $carry + (float) ($invoice['amount'] ?? 0);
 }, 0.0);
+$activeIncoming = count(array_filter($incomingRequests, static fn(array $request): bool => strtolower((string) ($request['status'] ?? 'submitted')) !== 'closed'));
+$assignedShipments = count(array_filter($shipments, static fn(array $shipment): bool => trim((string) ($shipment['assigned_to'] ?? '')) !== ''));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -88,29 +109,32 @@ $outstandingValue = array_reduce($invoices, static function (float $carry, array
       <section class="dashboard-hero">
         <div>
           <div class="eyebrow">Admin dashboard</div>
-          <h1>Monitor business performance, workload, and service health.</h1>
+          <h1>Run shipments, billing, and team ownership from one control center.</h1>
           <p>
-            Signed in as <strong><?= htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8') ?></strong>.
-            Review quotes, invoicing, active jobs, staff productivity, and service performance from a secured management view.
+            Signed in as <strong><?= htmlspecialchars((string) ($user['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>.
+            Manage client-submitted incoming cargo details, open shipment records, and move every milestone forward with full operational visibility.
           </p>
         </div>
         <div class="dashboard-actions">
-          <a class="button primary" href="create-invoice.php">Create Invoice</a>
-          <a class="button secondary" href="create-shipment.php">Create Shipment</a>
+          <a class="button primary" href="create-shipment.php">Create Shipment</a>
+          <a class="button secondary" href="create-invoice.php">Create Invoice</a>
           <a class="button secondary" href="create-quote.php">Create Quote</a>
-        </div>
-        <div class="dashboard-actions">
-          <a class="button primary" href="staff-dashboard.php">Open Staff Dashboard</a>
-          <a class="button secondary" href="client-dashboard.php">Open Client Portal</a>
         </div>
       </section>
 
       <section class="dashboard-stats">
         <article class="dashboard-stat"><strong>KES <?= number_format($outstandingValue, 2) ?></strong><span>Outstanding invoice value</span></article>
         <article class="dashboard-stat"><strong><?= (int) $userCounts['client'] ?></strong><span>Client accounts</span></article>
-        <article class="dashboard-stat"><strong><?= count($shipments) ?></strong><span>Tracked shipments</span></article>
-        <article class="dashboard-stat"><strong><?= $dueInvoices ?></strong><span>Invoices awaiting payment</span></article>
+        <article class="dashboard-stat"><strong><?= $activeIncoming ?></strong><span>Incoming cargo alerts</span></article>
+        <article class="dashboard-stat"><strong><?= $assignedShipments ?></strong><span>Assigned shipments</span></article>
       </section>
+
+      <?php if ($recordError !== ''): ?>
+        <div class="result-box show result-error"><strong>Action failed.</strong><p><?= htmlspecialchars($recordError, ENT_QUOTES, 'UTF-8') ?></p></div>
+      <?php endif; ?>
+      <?php if ($recordMessage !== ''): ?>
+        <div class="result-box show result-success"><strong>Action completed.</strong><p><?= htmlspecialchars($recordMessage, ENT_QUOTES, 'UTF-8') ?></p></div>
+      <?php endif; ?>
 
       <section class="dashboard-grid">
         <article class="dashboard-card">
@@ -122,7 +146,7 @@ $outstandingValue = array_reduce($invoices, static function (float $carry, array
             </thead>
             <tbody>
               <tr><td>Open Quotes</td><td><?= count($quotes) ?></td><td><span class="badge badge-blue">Live</span></td></tr>
-              <tr><td>Invoices Due</td><td>KES <?= number_format($outstandingValue, 2) ?></td><td><span class="badge <?= $dueInvoices > 0 ? 'badge-gold' : 'badge-green' ?>"><?= $dueInvoices > 0 ? 'Review' : 'Clear' ?></span></td></tr>
+              <tr><td>Invoices Due</td><td><?= $dueInvoices ?></td><td><span class="badge <?= $dueInvoices > 0 ? 'badge-gold' : 'badge-green' ?>"><?= $dueInvoices > 0 ? 'Review' : 'Clear' ?></span></td></tr>
               <tr><td>Shipments in Customs</td><td><?= $customsShipments ?></td><td><span class="badge <?= $customsShipments > 0 ? 'badge-gold' : 'badge-green' ?>"><?= $customsShipments > 0 ? 'Active' : 'Clear' ?></span></td></tr>
               <tr><td>Delivered Shipments</td><td><?= $deliveredShipments ?></td><td><span class="badge badge-green">Completed</span></td></tr>
             </tbody>
@@ -132,176 +156,51 @@ $outstandingValue = array_reduce($invoices, static function (float $carry, array
         <article class="dashboard-card">
           <h3>Leadership Priorities</h3>
           <div class="timeline">
-            <div class="timeline-item"><strong><?= $dueInvoices ?> invoices need follow-up</strong><p>Outstanding billing records remain visible until they are marked paid.</p></div>
-            <div class="timeline-item"><strong><?= $customsShipments ?> shipment records are in customs</strong><p>Operations teams can move them forward by updating status and next step.</p></div>
-            <div class="timeline-item"><strong><?= count($quotes) ?> quotes are currently logged</strong><p>Commercial activity is now tied directly to registered client accounts.</p></div>
+            <div class="timeline-item"><strong><?= $activeIncoming ?> incoming alerts need intake review</strong><p>Convert client supplier references into shipment records as soon as origin, destination, and mode are confirmed.</p></div>
+            <div class="timeline-item"><strong><?= $assignedShipments ?> shipments already have owners</strong><p>Use the shipment detail pages to keep status history and ownership accurate.</p></div>
+            <div class="timeline-item"><strong><?= $dueInvoices ?> invoices remain open</strong><p>Accounts follow-up stays easier when invoice status is updated promptly.</p></div>
           </div>
         </article>
       </section>
 
       <section class="dashboard-grid">
         <article class="dashboard-card">
-          <h2>Operations Workflow</h2>
-          <p class="dashboard-subtitle">Open the dedicated pages for shipments, quotes, and invoices instead of creating everything inside one screen.</p>
-          <?php if ($recordError !== ''): ?>
-            <div class="result-box show"><strong>Action failed.</strong><p><?= htmlspecialchars($recordError, ENT_QUOTES, 'UTF-8') ?></p></div>
-          <?php endif; ?>
-          <?php if ($recordMessage !== ''): ?>
-            <div class="result-box show"><strong>Action completed.</strong><p><?= htmlspecialchars($recordMessage, ENT_QUOTES, 'UTF-8') ?></p></div>
-          <?php endif; ?>
-          <?php if (!bani_records_ready()): ?>
-            <div class="result-box show"><strong>Database tables pending.</strong><p>Run the updated SQL schema import first so shipment, quote, and invoice records can be stored.</p></div>
-          <?php endif; ?>
-          <div class="workflow-grid">
-            <article class="dashboard-card workflow-card">
-              <h3>Create Shipment</h3>
-              <p class="muted">Open a dedicated shipment page to key in routing, assignment, next step, and internal notes.</p>
-              <a class="button primary" href="create-shipment.php">Open Shipment Page</a>
-            </article>
-            <article class="dashboard-card workflow-card">
-              <h3>Create Quote</h3>
-              <p class="muted">Prepare a client-linked commercial quote on its own page and keep it tied to the same account history.</p>
-              <a class="button primary" href="create-quote.php">Open Quote Page</a>
-            </article>
-            <article class="dashboard-card workflow-card">
-              <h3>Create Invoice</h3>
-              <p class="muted">Build an invoice, then review the final invoice format and the accounts-team copy route before delivery.</p>
-              <a class="button primary" href="create-invoice.php">Open Invoice Page</a>
-            </article>
-          </div>
-        </article>
-
-        <article class="dashboard-card">
-          <h3>Recent Operations Records</h3>
-          <ul class="dashboard-list">
-            <li><span>Shipments Logged<br><small>Current stored shipment records</small></span><span><?= count($shipments) ?></span></li>
-            <li><span>Quotes Logged<br><small>Current stored quote records</small></span><span><?= count($quotes) ?></span></li>
-            <li><span>Invoices Logged<br><small>Current stored invoice records</small></span><span><?= count($invoices) ?></span></li>
-            <li><span>Paid Invoices<br><small>Billing records marked settled</small></span><span><?= $paidInvoices ?></span></li>
-          </ul>
-        </article>
-      </section>
-
-      <section class="dashboard-grid">
-        <article class="dashboard-card">
-          <h2>Client Account Management</h2>
-          <p class="dashboard-subtitle">Manage customer access, registration volume, and account status from one control point.</p>
-          <?php if ($accountError !== ''): ?>
-            <div class="result-box show"><strong>Update failed.</strong><p><?= htmlspecialchars($accountError, ENT_QUOTES, 'UTF-8') ?></p></div>
-          <?php endif; ?>
-          <?php if ($accountMessage !== ''): ?>
-            <div class="result-box show"><strong>Update completed.</strong><p><?= htmlspecialchars($accountMessage, ENT_QUOTES, 'UTF-8') ?></p></div>
-          <?php endif; ?>
+          <h2>Incoming Requests To Convert</h2>
+          <p class="dashboard-subtitle">Turn client-submitted supplier details into live shipment records without retyping everything later.</p>
           <table class="dashboard-table">
             <thead>
-              <tr><th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Created</th><th>Last Login</th><th>Action</th></tr>
+              <tr><th>Supplier Tracking</th><th>Client</th><th>Item</th><th>Status</th><th>Convert</th></tr>
             </thead>
             <tbody>
-              <?php foreach ($clientAccounts as $account): ?>
-                <tr>
-                  <td><?= htmlspecialchars((string) ($account['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                  <td><?= htmlspecialchars((string) ($account['company'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                  <td><?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                  <td><span class="badge <?= ($account['status'] ?? 'active') === 'active' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($account['status'] ?? 'active'), ENT_QUOTES, 'UTF-8') ?></span></td>
-                  <td><?= htmlspecialchars(bani_format_datetime($account['created_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
-                  <td><?= htmlspecialchars(bani_format_datetime($account['last_login_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
-                  <td>
-                    <form method="post" action="admin-dashboard.php" class="inline-actions">
-                      <input type="hidden" name="action" value="update-account-status">
-                      <input type="hidden" name="account_email" value="<?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                      <input type="hidden" name="account_status" value="<?= ($account['status'] ?? 'active') === 'active' ? 'suspended' : 'active' ?>">
-                      <button type="submit"><?= ($account['status'] ?? 'active') === 'active' ? 'Suspend' : 'Activate' ?></button>
-                    </form>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </article>
-
-        <article class="dashboard-card">
-          <h3>Access Summary</h3>
-          <ul class="dashboard-list">
-            <li><span>Total Accounts<br><small>All roles across the system</small></span><span><?= (int) $userCounts['total'] ?></span></li>
-            <li><span>Client Accounts<br><small>Customer portal registrations</small></span><span><?= (int) $userCounts['client'] ?></span></li>
-            <li><span>Suspended Accounts<br><small>Temporarily blocked access</small></span><span><?= (int) $userCounts['suspended'] ?></span></li>
-            <li><span>Latest Registration<br><small>Most recent client account created</small></span><span><?= htmlspecialchars(isset($clientAccounts[0]) ? bani_format_datetime($clientAccounts[array_key_last($clientAccounts)]['created_at'] ?? null) : 'Not available', ENT_QUOTES, 'UTF-8') ?></span></li>
-            <li><span>Storage Mode<br><small>Current account backend in use</small></span><span><?= htmlspecialchars($storageMode, ENT_QUOTES, 'UTF-8') ?></span></li>
-          </ul>
-        </article>
-      </section>
-
-      <section class="dashboard-grid">
-        <article class="dashboard-card">
-          <h2>Latest Shipments</h2>
-          <table class="dashboard-table">
-            <thead>
-              <tr><th>Reference</th><th>Client</th><th>Route</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              <?php if ($shipments === []): ?>
-                <tr><td colspan="4">No shipment records available yet.</td></tr>
+              <?php if ($incomingRequests === []): ?>
+                <tr><td colspan="5">No incoming supplier requests have been submitted yet.</td></tr>
               <?php else: ?>
-                <?php foreach ($shipments as $shipment): ?>
+                <?php foreach ($incomingRequests as $incoming): ?>
                   <tr>
-                    <td><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars((string) ($shipment['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars((string) (($shipment['origin'] ?? '') . ' to ' . ($shipment['destination'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                  </tr>
-                <?php endforeach; ?>
-              <?php endif; ?>
-            </tbody>
-          </table>
-        </article>
-
-        <article class="dashboard-card">
-          <h2>Latest Quotes & Invoices</h2>
-          <div class="timeline">
-            <?php foreach (array_slice($quotes, 0, 4) as $quote): ?>
-              <div class="timeline-item">
-                <strong><?= htmlspecialchars((string) ($quote['quote_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars((string) ($quote['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
-                <p><?= htmlspecialchars((string) (($quote['currency'] ?? 'KES') . ' ' . number_format((float) ($quote['amount'] ?? 0), 2) . ' • ' . ($quote['status'] ?? '')), ENT_QUOTES, 'UTF-8') ?></p>
-              </div>
-            <?php endforeach; ?>
-            <?php foreach (array_slice($invoices, 0, 4) as $invoice): ?>
-              <div class="timeline-item">
-                <strong><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars((string) ($invoice['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
-                <p><?= htmlspecialchars((string) (($invoice['currency'] ?? 'KES') . ' ' . number_format((float) ($invoice['amount'] ?? 0), 2) . ' • Due ' . ($invoice['due_date'] ?? '')), ENT_QUOTES, 'UTF-8') ?></p>
-              </div>
-            <?php endforeach; ?>
-            <?php if ($quotes === [] && $invoices === []): ?>
-              <div class="timeline-item"><strong>No records yet</strong><p>Quotes and invoices will appear here after creation.</p></div>
-            <?php endif; ?>
-          </div>
-        </article>
-      </section>
-
-      <section class="dashboard-mini-grid">
-        <article class="dashboard-card">
-          <h3>Shipment Processing</h3>
-          <table class="dashboard-table">
-            <thead>
-              <tr><th>Reference</th><th>Assigned</th><th>Status</th><th>Update</th></tr>
-            </thead>
-            <tbody>
-              <?php if ($shipments === []): ?>
-                <tr><td colspan="4">No shipments available for processing yet.</td></tr>
-              <?php else: ?>
-                <?php foreach (array_slice($shipments, 0, 4) as $shipment): ?>
-                  <tr>
-                    <td><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars((string) ($shipment['assigned_name'] ?? 'Unassigned'), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($incoming['supplier_tracking_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($incoming['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($incoming['item_description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><span class="badge badge-blue"><?= htmlspecialchars((string) ($incoming['status'] ?? 'Submitted'), ENT_QUOTES, 'UTF-8') ?></span></td>
                     <td>
-                      <form method="post" action="admin-dashboard.php" class="inline-actions">
-                        <input type="hidden" name="action" value="update-shipment">
-                        <input type="hidden" name="shipment_id" value="<?= (int) ($shipment['id'] ?? 0) ?>">
-                        <input type="hidden" name="status" value="Delivered">
-                        <input type="hidden" name="next_step" value="Customer delivery confirmation completed">
-                        <input type="hidden" name="assigned_to" value="<?= htmlspecialchars((string) ($shipment['assigned_to'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                        <input type="hidden" name="internal_notes" value="<?= htmlspecialchars((string) ($shipment['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                        <button type="submit">Mark Delivered</button>
+                      <form method="post" action="admin-dashboard.php" class="inline-form-stack">
+                        <input type="hidden" name="action" value="convert-incoming">
+                        <input type="hidden" name="request_id" value="<?= (int) ($incoming['id'] ?? 0) ?>">
+                        <input type="text" name="destination" placeholder="Destination" required>
+                        <select name="mode">
+                          <option value="Air Freight">Air Freight</option>
+                          <option value="Sea Freight">Sea Freight</option>
+                          <option value="Road Delivery">Road Delivery</option>
+                        </select>
+                        <select name="assigned_to">
+                          <option value="">Assign later</option>
+                          <?php foreach ($staffUsers as $staffUser): ?>
+                            <option value="<?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                              <?= htmlspecialchars((string) ($staffUser['name'] ?? $staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                        <input type="text" name="next_step" value="Awaiting supplier release and transit booking" required>
+                        <button type="submit">Convert To Shipment</button>
                       </form>
                     </td>
                   </tr>
@@ -310,21 +209,114 @@ $outstandingValue = array_reduce($invoices, static function (float $carry, array
             </tbody>
           </table>
         </article>
+
         <article class="dashboard-card">
-          <h3>Invoice Actions</h3>
+          <h3>Incoming Request Board</h3>
+          <ul class="dashboard-list">
+            <?php foreach (array_slice($incomingRequests, 0, 5) as $incoming): ?>
+              <li>
+                <span>
+                  <?= htmlspecialchars((string) ($incoming['supplier_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
+                  <small><?= htmlspecialchars((string) ($incoming['supplier_tracking_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars((string) ($incoming['origin'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
+                </span>
+                <form method="post" action="admin-dashboard.php" class="inline-actions">
+                  <input type="hidden" name="action" value="update-incoming-status">
+                  <input type="hidden" name="request_id" value="<?= (int) ($incoming['id'] ?? 0) ?>">
+                  <input type="hidden" name="incoming_status" value="<?= strtolower((string) ($incoming['status'] ?? '')) === 'closed' ? 'Reviewing' : 'Closed' ?>">
+                  <button type="submit"><?= strtolower((string) ($incoming['status'] ?? '')) === 'closed' ? 'Reopen' : 'Close' ?></button>
+                </form>
+              </li>
+            <?php endforeach; ?>
+            <?php if ($incomingRequests === []): ?>
+              <li><span>No incoming alerts yet<br><small>Client-submitted supplier references will appear here.</small></span><span>Awaiting</span></li>
+            <?php endif; ?>
+          </ul>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card">
+          <h2>Shipment Control Center</h2>
+          <p class="dashboard-subtitle">Open the shipment detail page for full milestone history, or update ownership and next step directly from here.</p>
           <table class="dashboard-table">
             <thead>
-              <tr><th>Invoice</th><th>Client</th><th>Status</th><th>Update</th></tr>
+              <tr><th>Reference</th><th>Client</th><th>Owner</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              <?php if ($shipments === []): ?>
+                <tr><td colspan="5">No shipment records available yet.</td></tr>
+              <?php else: ?>
+                <?php foreach ($shipments as $shipment): ?>
+                  <tr>
+                    <td><a href="shipment-detail.php?id=<?= (int) ($shipment['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a></td>
+                    <td><?= htmlspecialchars((string) ($shipment['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars((string) ($shipment['assigned_name'] ?? 'Unassigned'), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><span class="badge <?= stripos((string) ($shipment['status'] ?? ''), 'customs') !== false ? 'badge-gold' : 'badge-blue' ?>"><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></td>
+                    <td>
+                      <form method="post" action="admin-dashboard.php" class="inline-form-stack">
+                        <input type="hidden" name="action" value="update-shipment">
+                        <input type="hidden" name="shipment_id" value="<?= (int) ($shipment['id'] ?? 0) ?>">
+                        <select name="status">
+                          <?php foreach (['Submitted', 'Order Confirmed', 'In Transit', 'Customs Clearance', 'Released from Customs', 'Out for Delivery', 'Delivered'] as $statusOption): ?>
+                            <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"<?= (($shipment['status'] ?? '') === $statusOption) ? ' selected' : '' ?>><?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                        <input type="text" name="next_step" value="<?= htmlspecialchars((string) ($shipment['next_step'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" placeholder="Next step">
+                        <select name="assigned_to">
+                          <option value="">Unassigned</option>
+                          <?php foreach ($staffUsers as $staffUser): ?>
+                            <option value="<?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"<?= (($shipment['assigned_to'] ?? '') === ($staffUser['email'] ?? '')) ? ' selected' : '' ?>>
+                              <?= htmlspecialchars((string) ($staffUser['name'] ?? $staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                        <textarea name="internal_notes" placeholder="Internal operations note"><?= htmlspecialchars((string) ($shipment['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <button type="submit">Save Update</button>
+                      </form>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </article>
+
+        <article class="dashboard-card">
+          <h3>Team Ownership</h3>
+          <ul class="dashboard-list">
+            <?php foreach ($staffUsers as $staffUser): ?>
+              <?php $owned = array_filter($shipments, static fn(array $shipment): bool => ($shipment['assigned_to'] ?? '') === ($staffUser['email'] ?? '')); ?>
+              <li>
+                <span>
+                  <?= htmlspecialchars((string) ($staffUser['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
+                  <small><?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
+                </span>
+                <span><?= count($owned) ?> active tasks</span>
+              </li>
+            <?php endforeach; ?>
+            <?php if ($staffUsers === []): ?>
+              <li><span>No staff accounts found<br><small>Create staff users when ready.</small></span><span>Awaiting</span></li>
+            <?php endif; ?>
+          </ul>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card">
+          <h2>Invoice Actions</h2>
+          <table class="dashboard-table">
+            <thead>
+              <tr><th>Invoice</th><th>Client</th><th>Status</th><th>Action</th></tr>
             </thead>
             <tbody>
               <?php if ($invoices === []): ?>
                 <tr><td colspan="4">No invoices available yet.</td></tr>
               <?php else: ?>
-                <?php foreach (array_slice($invoices, 0, 4) as $invoice): ?>
+                <?php foreach ($invoices as $invoice): ?>
                   <tr>
-                    <td><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><a href="invoice-view.php?id=<?= (int) ($invoice['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a></td>
                     <td><?= htmlspecialchars((string) ($invoice['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><span class="badge <?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></td>
                     <td>
                       <form method="post" action="admin-dashboard.php" class="inline-actions">
                         <input type="hidden" name="action" value="update-invoice-status">
@@ -339,13 +331,39 @@ $outstandingValue = array_reduce($invoices, static function (float $carry, array
             </tbody>
           </table>
         </article>
+
         <article class="dashboard-card">
-          <h3>Operations Team</h3>
-          <ul class="dashboard-list">
-            <?php foreach ($staffUsers as $staffUser): ?>
-              <li><span><?= htmlspecialchars((string) ($staffUser['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span><span><?= htmlspecialchars((string) ($staffUser['role'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
-            <?php endforeach; ?>
-          </ul>
+          <h2>Client Account Management</h2>
+          <?php if ($accountError !== ''): ?>
+            <div class="result-box show result-error"><strong>Update failed.</strong><p><?= htmlspecialchars($accountError, ENT_QUOTES, 'UTF-8') ?></p></div>
+          <?php endif; ?>
+          <?php if ($accountMessage !== ''): ?>
+            <div class="result-box show result-success"><strong>Update completed.</strong><p><?= htmlspecialchars($accountMessage, ENT_QUOTES, 'UTF-8') ?></p></div>
+          <?php endif; ?>
+          <table class="dashboard-table">
+            <thead>
+              <tr><th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              <?php foreach ($clientAccounts as $account): ?>
+                <tr>
+                  <td><?= htmlspecialchars((string) ($account['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                  <td><?= htmlspecialchars((string) ($account['company'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                  <td><?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                  <td><span class="badge <?= ($account['status'] ?? 'active') === 'active' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($account['status'] ?? 'active'), ENT_QUOTES, 'UTF-8') ?></span></td>
+                  <td>
+                    <form method="post" action="admin-dashboard.php" class="inline-actions">
+                      <input type="hidden" name="action" value="update-account-status">
+                      <input type="hidden" name="account_email" value="<?= htmlspecialchars((string) ($account['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                      <input type="hidden" name="account_status" value="<?= ($account['status'] ?? 'active') === 'active' ? 'suspended' : 'active' ?>">
+                      <button type="submit"><?= ($account['status'] ?? 'active') === 'active' ? 'Suspend' : 'Activate' ?></button>
+                    </form>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+          <p class="muted">Storage mode: <?= htmlspecialchars($storageMode, ENT_QUOTES, 'UTF-8') ?></p>
         </article>
       </section>
     </main>

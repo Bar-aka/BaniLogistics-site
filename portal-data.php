@@ -47,7 +47,7 @@ function bani_fetch_shipments(?string $clientEmail = null, int $limit = 20): arr
 
     if ($clientEmail !== null) {
         $statement = $pdo->prepare(
-            "SELECT id, client_email, reference, client_name, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at
+            "SELECT id, client_email, reference, client_name, incoming_request_id, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at
              FROM portal_shipments
              WHERE client_email = :client_email
              ORDER BY created_at DESC
@@ -56,7 +56,7 @@ function bani_fetch_shipments(?string $clientEmail = null, int $limit = 20): arr
         $statement->execute([':client_email' => strtolower(trim($clientEmail))]);
     } else {
         $statement = $pdo->query(
-            "SELECT id, client_email, reference, client_name, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at
+            "SELECT id, client_email, reference, client_name, incoming_request_id, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at
              FROM portal_shipments
              ORDER BY created_at DESC
              LIMIT {$limit}"
@@ -77,7 +77,7 @@ function bani_fetch_shipment_by_id(int $shipmentId): ?array
     }
 
     $statement = $pdo->prepare(
-        'SELECT id, client_email, reference, client_name, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at
+        'SELECT id, client_email, reference, client_name, incoming_request_id, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at
          FROM portal_shipments
          WHERE id = :id
          LIMIT 1'
@@ -227,6 +227,46 @@ function bani_fetch_incoming_requests(?string $clientEmail = null, int $limit = 
     return is_array($rows) ? $rows : [];
 }
 
+function bani_fetch_incoming_request_by_id(int $requestId): ?array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_incoming_requests') || $requestId <= 0) {
+        return null;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, notes, created_at, updated_at
+         FROM portal_incoming_requests
+         WHERE id = :id
+         LIMIT 1'
+    );
+    $statement->execute([':id' => $requestId]);
+    $row = $statement->fetch();
+
+    return is_array($row) ? $row : null;
+}
+
+function bani_fetch_shipment_updates(int $shipmentId): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_shipment_updates') || $shipmentId <= 0) {
+        return [];
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT id, shipment_id, shipment_reference, status, next_step, notes, actor_email, actor_name, created_at
+         FROM portal_shipment_updates
+         WHERE shipment_id = :shipment_id
+         ORDER BY created_at ASC, id ASC'
+    );
+    $statement->execute([':shipment_id' => $shipmentId]);
+    $rows = $statement->fetchAll();
+
+    return is_array($rows) ? $rows : [];
+}
+
 function bani_client_summary(string $clientEmail): array
 {
     $shipments = bani_fetch_shipments($clientEmail, 100);
@@ -305,6 +345,67 @@ function bani_create_incoming_request(string $clientEmail, array $input): array
         'success' => true,
         'message' => 'Incoming cargo details received. Operations can now align the shipment with supplier tracking updates.',
     ];
+}
+
+function bani_update_incoming_request_status(int $requestId, string $status): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_incoming_requests')) {
+        return ['success' => false, 'message' => 'Incoming cargo intake is not ready yet.'];
+    }
+
+    $status = trim($status);
+    if ($requestId <= 0 || $status === '') {
+        return ['success' => false, 'message' => 'A valid incoming request and status are required.'];
+    }
+
+    $statement = $pdo->prepare(
+        'UPDATE portal_incoming_requests
+         SET status = :status,
+             updated_at = :updated_at
+         WHERE id = :id'
+    );
+
+    $statement->execute([
+        ':status' => $status,
+        ':updated_at' => gmdate('Y-m-d H:i:s'),
+        ':id' => $requestId,
+    ]);
+
+    return ['success' => true, 'message' => 'Incoming cargo status updated successfully.'];
+}
+
+function bani_log_shipment_update(array $shipment, string $status, string $nextStep, ?string $notes = null): void
+{
+    $pdo = bani_db();
+
+    if (
+        !$pdo instanceof PDO
+        || !bani_records_table_available('portal_shipment_updates')
+        || !isset($shipment['id'], $shipment['reference'])
+    ) {
+        return;
+    }
+
+    $actor = bani_current_user();
+    $statement = $pdo->prepare(
+        'INSERT INTO portal_shipment_updates
+         (shipment_id, shipment_reference, status, next_step, notes, actor_email, actor_name, created_at)
+         VALUES
+         (:shipment_id, :shipment_reference, :status, :next_step, :notes, :actor_email, :actor_name, :created_at)'
+    );
+
+    $statement->execute([
+        ':shipment_id' => (int) $shipment['id'],
+        ':shipment_reference' => (string) $shipment['reference'],
+        ':status' => $status,
+        ':next_step' => $nextStep,
+        ':notes' => $notes !== null && trim($notes) !== '' ? trim($notes) : null,
+        ':actor_email' => is_array($actor) ? (string) ($actor['email'] ?? '') : null,
+        ':actor_name' => is_array($actor) ? (string) ($actor['name'] ?? '') : null,
+        ':created_at' => gmdate('Y-m-d H:i:s'),
+    ]);
 }
 
 function bani_api_enabled(): bool
@@ -463,6 +564,7 @@ function bani_create_shipment(array $input): array
     $status = trim((string) ($input['status'] ?? ''));
     $nextStep = trim((string) ($input['next_step'] ?? ''));
     $assignedTo = strtolower(trim((string) ($input['assigned_to'] ?? '')));
+    $incomingRequestId = (int) ($input['incoming_request_id'] ?? 0);
 
     if ($clientEmail === '' || $origin === '' || $destination === '' || $mode === '' || $status === '' || $nextStep === '') {
         return ['success' => false, 'message' => 'Please complete all shipment fields.'];
@@ -486,14 +588,15 @@ function bani_create_shipment(array $input): array
     $timestamp = gmdate('Y-m-d H:i:s');
 
     $statement = $pdo->prepare(
-        'INSERT INTO portal_shipments (client_email, reference, client_name, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at)
-         VALUES (:client_email, :reference, :client_name, :assigned_to, :assigned_name, :origin, :destination, :mode, :status, :next_step, :internal_notes, :created_at, :updated_at)'
+        'INSERT INTO portal_shipments (client_email, reference, client_name, incoming_request_id, assigned_to, assigned_name, origin, destination, mode, status, next_step, internal_notes, created_at, updated_at)
+         VALUES (:client_email, :reference, :client_name, :incoming_request_id, :assigned_to, :assigned_name, :origin, :destination, :mode, :status, :next_step, :internal_notes, :created_at, :updated_at)'
     );
 
     $statement->execute([
         ':client_email' => $client['email'],
         ':reference' => $reference,
         ':client_name' => $client['name'],
+        ':incoming_request_id' => $incomingRequestId > 0 ? $incomingRequestId : null,
         ':assigned_to' => $assignedTo !== '' ? $assignedTo : null,
         ':assigned_name' => $assignedName,
         ':origin' => $origin,
@@ -513,9 +616,17 @@ function bani_create_shipment(array $input): array
         'reference' => $reference,
     ];
 
-    if (bani_api_enabled()) {
-        $createdShipment = bani_fetch_shipment_by_id((int) $result['id']);
+    $createdShipment = bani_fetch_shipment_by_id((int) $result['id']);
+    if (is_array($createdShipment)) {
+        bani_log_shipment_update(
+            $createdShipment,
+            $status,
+            $nextStep,
+            trim((string) ($input['internal_notes'] ?? '')) !== '' ? (string) ($input['internal_notes'] ?? '') : 'Shipment opened in the portal.'
+        );
+    }
 
+    if (bani_api_enabled()) {
         if (is_array($createdShipment)) {
             $apiSync = bani_sync_shipment_to_api($createdShipment, $input);
             $result['api_sync'] = (bool) ($apiSync['success'] ?? false);
@@ -584,7 +695,58 @@ function bani_update_shipment(int $shipmentId, array $input): array
         ':id' => $shipmentId,
     ]);
 
+    $noteSummary = $internalNotes !== '' ? $internalNotes : 'Shipment milestone updated.';
+    bani_log_shipment_update([
+        'id' => $shipmentId,
+        'reference' => (string) ($shipment['reference'] ?? ''),
+    ], $status, $nextStep, $noteSummary);
+
     return ['success' => true, 'message' => 'Shipment updated successfully.'];
+}
+
+function bani_convert_incoming_request_to_shipment(int $requestId, array $input): array
+{
+    $incoming = bani_fetch_incoming_request_by_id($requestId);
+
+    if (!is_array($incoming)) {
+        return ['success' => false, 'message' => 'Incoming request was not found.'];
+    }
+
+    $mode = trim((string) ($input['mode'] ?? ''));
+    $destination = trim((string) ($input['destination'] ?? ''));
+    $assignedTo = trim((string) ($input['assigned_to'] ?? ''));
+    $nextStep = trim((string) ($input['next_step'] ?? ''));
+
+    if ($mode === '' || $destination === '' || $nextStep === '') {
+        return ['success' => false, 'message' => 'Destination, mode, and next step are required to convert an incoming request into a shipment.'];
+    }
+
+    $shipmentResult = bani_create_shipment([
+        'client_email' => (string) ($incoming['client_email'] ?? ''),
+        'incoming_request_id' => $requestId,
+        'origin' => (string) ($incoming['origin'] ?? ''),
+        'destination' => $destination,
+        'mode' => $mode,
+        'status' => 'Order Confirmed',
+        'next_step' => $nextStep,
+        'assigned_to' => $assignedTo,
+        'cargo' => (string) ($incoming['item_description'] ?? ''),
+        'internal_notes' => trim((string) ($incoming['notes'] ?? '')) !== ''
+            ? 'Converted from incoming request. ' . trim((string) ($incoming['notes'] ?? ''))
+            : 'Converted from incoming request. Supplier tracking: ' . (string) ($incoming['supplier_tracking_number'] ?? ''),
+    ]);
+
+    if (($shipmentResult['success'] ?? false) !== true) {
+        return $shipmentResult;
+    }
+
+    bani_update_incoming_request_status($requestId, 'Shipment Opened');
+
+    return [
+        'success' => true,
+        'message' => (string) ($shipmentResult['message'] ?? 'Shipment created successfully.') . ' Incoming request converted successfully.',
+        'shipment_id' => (int) ($shipmentResult['id'] ?? 0),
+    ];
 }
 
 function bani_update_invoice_status(int $invoiceId, string $status): array

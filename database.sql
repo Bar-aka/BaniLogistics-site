@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS portal_shipments (
   client_email VARCHAR(190) NOT NULL,
   reference VARCHAR(40) NOT NULL UNIQUE,
   client_name VARCHAR(190) NOT NULL,
+  incoming_request_id INT UNSIGNED NULL,
   assigned_to VARCHAR(190) NULL,
   assigned_name VARCHAR(190) NULL,
   origin VARCHAR(190) NOT NULL,
@@ -31,6 +32,20 @@ CREATE TABLE IF NOT EXISTS portal_shipments (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_portal_shipments_client_email (client_email),
   INDEX idx_portal_shipments_status (status)
+);
+
+CREATE TABLE IF NOT EXISTS portal_shipment_updates (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  shipment_id INT UNSIGNED NOT NULL,
+  shipment_reference VARCHAR(40) NOT NULL,
+  status VARCHAR(80) NOT NULL,
+  next_step VARCHAR(255) NOT NULL,
+  notes TEXT NULL,
+  actor_email VARCHAR(190) NULL,
+  actor_name VARCHAR(190) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_portal_shipment_updates_shipment_id (shipment_id),
+  INDEX idx_portal_shipment_updates_reference (shipment_reference)
 );
 
 CREATE TABLE IF NOT EXISTS portal_quotes (
@@ -88,4 +103,5 @@ CREATE TABLE IF NOT EXISTS portal_incoming_requests (
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(190) NULL AFTER client_name;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190) NULL AFTER assigned_to;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT NULL AFTER next_step;
+ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS incoming_request_id INT UNSIGNED NULL AFTER client_name;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS tracking_reference VARCHAR(40) NULL AFTER client_name;
