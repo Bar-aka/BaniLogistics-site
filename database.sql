@@ -77,6 +77,17 @@ CREATE TABLE IF NOT EXISTS portal_invoices (
   currency VARCHAR(12) NOT NULL DEFAULT 'KES',
   status VARCHAR(80) NOT NULL,
   due_date DATE NOT NULL,
+  bank_name VARCHAR(190) NULL,
+  account_name VARCHAR(190) NULL,
+  account_number VARCHAR(120) NULL,
+  bank_branch VARCHAR(190) NULL,
+  swift_code VARCHAR(80) NULL,
+  mpesa_details TEXT NULL,
+  paypal_details TEXT NULL,
+  payment_instructions TEXT NULL,
+  payment_reference VARCHAR(190) NULL,
+  payment_notes TEXT NULL,
+  payment_submitted_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_portal_invoices_client_email (client_email),
@@ -105,3 +116,14 @@ ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190)
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT NULL AFTER next_step;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS incoming_request_id INT UNSIGNED NULL AFTER client_name;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS tracking_reference VARCHAR(40) NULL AFTER client_name;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS bank_name VARCHAR(190) NULL AFTER due_date;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS account_name VARCHAR(190) NULL AFTER bank_name;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS account_number VARCHAR(120) NULL AFTER account_name;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS bank_branch VARCHAR(190) NULL AFTER account_number;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS swift_code VARCHAR(80) NULL AFTER bank_branch;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS mpesa_details TEXT NULL AFTER swift_code;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS paypal_details TEXT NULL AFTER mpesa_details;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_instructions TEXT NULL AFTER paypal_details;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(190) NULL AFTER payment_instructions;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_notes TEXT NULL AFTER payment_reference;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_submitted_at DATETIME NULL AFTER payment_notes;

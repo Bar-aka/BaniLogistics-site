@@ -153,7 +153,7 @@ function bani_fetch_invoices(?string $clientEmail = null, int $limit = 20): arra
 
     if ($clientEmail !== null) {
         $statement = $pdo->prepare(
-            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, created_at, updated_at
+            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
              FROM portal_invoices
              WHERE client_email = :client_email
              ORDER BY created_at DESC
@@ -162,7 +162,7 @@ function bani_fetch_invoices(?string $clientEmail = null, int $limit = 20): arra
         $statement->execute([':client_email' => strtolower(trim($clientEmail))]);
     } else {
         $statement = $pdo->query(
-            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, created_at, updated_at
+            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
              FROM portal_invoices
              ORDER BY created_at DESC
              LIMIT {$limit}"
@@ -183,7 +183,7 @@ function bani_fetch_invoice_by_id(int $invoiceId): ?array
     }
 
     $statement = $pdo->prepare(
-        'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, created_at, updated_at
+        'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
          FROM portal_invoices
          WHERE id = :id
          LIMIT 1'
@@ -192,6 +192,45 @@ function bani_fetch_invoice_by_id(int $invoiceId): ?array
     $row = $statement->fetch();
 
     return is_array($row) ? $row : null;
+}
+
+function bani_fetch_invoices_by_tracking_reference(string $trackingReference, ?string $clientEmail = null): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_invoices')) {
+        return [];
+    }
+
+    $trackingReference = strtoupper(trim($trackingReference));
+    if ($trackingReference === '') {
+        return [];
+    }
+
+    if ($clientEmail !== null) {
+        $statement = $pdo->prepare(
+            'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
+             FROM portal_invoices
+             WHERE tracking_reference = :tracking_reference AND client_email = :client_email
+             ORDER BY created_at DESC'
+        );
+        $statement->execute([
+            ':tracking_reference' => $trackingReference,
+            ':client_email' => strtolower(trim($clientEmail)),
+        ]);
+    } else {
+        $statement = $pdo->prepare(
+            'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
+             FROM portal_invoices
+             WHERE tracking_reference = :tracking_reference
+             ORDER BY created_at DESC'
+        );
+        $statement->execute([':tracking_reference' => $trackingReference]);
+    }
+
+    $rows = $statement->fetchAll();
+
+    return is_array($rows) ? $rows : [];
 }
 
 function bani_fetch_incoming_requests(?string $clientEmail = null, int $limit = 20): array
@@ -772,6 +811,42 @@ function bani_update_invoice_status(int $invoiceId, string $status): array
     return ['success' => true, 'message' => 'Invoice status updated successfully.'];
 }
 
+function bani_submit_invoice_payment_reference(int $invoiceId, string $reference, string $notes = ''): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_invoices')) {
+        return ['success' => false, 'message' => 'Invoice storage is not ready yet.'];
+    }
+
+    $reference = trim($reference);
+    $notes = trim($notes);
+
+    if ($invoiceId <= 0 || $reference === '') {
+        return ['success' => false, 'message' => 'Payment reference is required.'];
+    }
+
+    $statement = $pdo->prepare(
+        'UPDATE portal_invoices
+         SET payment_reference = :payment_reference,
+             payment_notes = :payment_notes,
+             payment_submitted_at = :payment_submitted_at,
+             updated_at = :updated_at
+         WHERE id = :id'
+    );
+
+    $now = gmdate('Y-m-d H:i:s');
+    $statement->execute([
+        ':payment_reference' => $reference,
+        ':payment_notes' => $notes !== '' ? $notes : null,
+        ':payment_submitted_at' => $now,
+        ':updated_at' => $now,
+        ':id' => $invoiceId,
+    ]);
+
+    return ['success' => true, 'message' => 'Payment reference submitted successfully. Our accounts team will review it and confirm receipt.'];
+}
+
 function bani_staff_users(): array
 {
     return array_values(array_filter(
@@ -860,6 +935,14 @@ function bani_create_invoice(array $input): array
     $currency = trim((string) ($input['currency'] ?? 'KES'));
     $status = trim((string) ($input['status'] ?? ''));
     $dueDate = trim((string) ($input['due_date'] ?? ''));
+    $bankName = trim((string) ($input['bank_name'] ?? ''));
+    $accountName = trim((string) ($input['account_name'] ?? ''));
+    $accountNumber = trim((string) ($input['account_number'] ?? ''));
+    $bankBranch = trim((string) ($input['bank_branch'] ?? ''));
+    $swiftCode = trim((string) ($input['swift_code'] ?? ''));
+    $mpesaDetails = trim((string) ($input['mpesa_details'] ?? ''));
+    $paypalDetails = trim((string) ($input['paypal_details'] ?? ''));
+    $paymentInstructions = trim((string) ($input['payment_instructions'] ?? ''));
 
     if ($clientEmail === '' || $description === '' || $amount <= 0 || $currency === '' || $status === '' || $dueDate === '') {
         return ['success' => false, 'message' => 'Please complete all invoice fields with a valid amount and due date.'];
@@ -874,8 +957,8 @@ function bani_create_invoice(array $input): array
     $timestamp = gmdate('Y-m-d H:i:s');
 
     $statement = $pdo->prepare(
-        'INSERT INTO portal_invoices (client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, created_at, updated_at)
-         VALUES (:client_email, :invoice_number, :client_name, :tracking_reference, :description, :amount, :currency, :status, :due_date, :created_at, :updated_at)'
+        'INSERT INTO portal_invoices (client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, created_at, updated_at)
+         VALUES (:client_email, :invoice_number, :client_name, :tracking_reference, :description, :amount, :currency, :status, :due_date, :bank_name, :account_name, :account_number, :bank_branch, :swift_code, :mpesa_details, :paypal_details, :payment_instructions, :created_at, :updated_at)'
     );
 
     $statement->execute([
@@ -888,6 +971,14 @@ function bani_create_invoice(array $input): array
         ':currency' => $currency,
         ':status' => $status,
         ':due_date' => $dueDate,
+        ':bank_name' => $bankName !== '' ? $bankName : null,
+        ':account_name' => $accountName !== '' ? $accountName : null,
+        ':account_number' => $accountNumber !== '' ? $accountNumber : null,
+        ':bank_branch' => $bankBranch !== '' ? $bankBranch : null,
+        ':swift_code' => $swiftCode !== '' ? $swiftCode : null,
+        ':mpesa_details' => $mpesaDetails !== '' ? $mpesaDetails : null,
+        ':paypal_details' => $paypalDetails !== '' ? $paypalDetails : null,
+        ':payment_instructions' => $paymentInstructions !== '' ? $paymentInstructions : null,
         ':created_at' => $timestamp,
         ':updated_at' => $timestamp,
     ]);

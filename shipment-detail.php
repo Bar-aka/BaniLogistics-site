@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array((string) ($user['role'] ??
 
 $updates = bani_fetch_shipment_updates($shipmentId);
 $incomingRequest = !empty($shipment['incoming_request_id']) ? bani_fetch_incoming_request_by_id((int) $shipment['incoming_request_id']) : null;
+$relatedInvoices = bani_fetch_invoices_by_tracking_reference((string) ($shipment['reference'] ?? ''), ($user['role'] ?? '') === 'client' ? (string) ($user['email'] ?? '') : null);
 $staffUsers = bani_staff_users();
 $dashboardUrl = ($user['role'] ?? '') === 'admin'
     ? 'admin-dashboard.php'
@@ -136,6 +137,24 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin'
             </div>
           <?php endif; ?>
 
+          <div class="detail-panel">
+            <h3>Related Invoices</h3>
+            <ul class="dashboard-list">
+              <?php foreach ($relatedInvoices as $invoice): ?>
+                <li>
+                  <span>
+                    <a href="invoice-view.php?id=<?= (int) ($invoice['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a><br>
+                    <small><?= htmlspecialchars((string) ($invoice['currency'] ?? 'KES'), ENT_QUOTES, 'UTF-8') ?> <?= number_format((float) ($invoice['amount'] ?? 0), 2) ?></small>
+                  </span>
+                  <span class="badge <?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                </li>
+              <?php endforeach; ?>
+              <?php if ($relatedInvoices === []): ?>
+                <li><span>No linked invoices yet<br><small>Once billing is created against this tracking number, the invoice link will appear here.</small></span><span>Awaiting</span></li>
+              <?php endif; ?>
+            </ul>
+          </div>
+
           <?php if (in_array((string) ($user['role'] ?? ''), ['staff', 'admin'], true)): ?>
             <div class="detail-panel">
               <h3>Update Shipment</h3>
@@ -179,5 +198,6 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin'
     </main>
 
     <a class="whatsapp-float" href="https://wa.me/254782013236" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+    <script src="/js/script.js"></script>
   </body>
 </html>

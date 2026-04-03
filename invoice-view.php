@@ -4,74 +4,62 @@ declare(strict_types=1);
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/portal-data.php';
 
-$user = bani_current_user();
-
-if (!$user) {
-    header('Location: login.php?role=client');
-    exit;
-}
-
-$invoiceId = (int) ($_GET['id'] ?? 0);
+$user = bani_require_roles(['client', 'staff', 'admin']);
+$invoiceId = (int) ($_GET['id'] ?? $_POST['invoice_id'] ?? 0);
 $invoice = bani_fetch_invoice_by_id($invoiceId);
 
 if (!is_array($invoice)) {
     http_response_code(404);
-    exit('Invoice record was not found.');
+    exit('Invoice not found.');
 }
 
-$role = (string) ($user['role'] ?? '');
-if ($role === 'client' && strtolower((string) ($invoice['client_email'] ?? '')) !== strtolower((string) ($user['email'] ?? ''))) {
-    header('Location: client-dashboard.php');
-    exit;
+if (($user['role'] ?? '') === 'client' && strtolower((string) ($invoice['client_email'] ?? '')) !== strtolower((string) ($user['email'] ?? ''))) {
+    http_response_code(403);
+    exit('You do not have permission to view this invoice.');
 }
 
-$recordError = '';
 $recordMessage = '';
+$recordError = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($role, ['admin', 'staff'], true)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string) ($_POST['action'] ?? '');
 
-    if ($action === 'update-invoice-status') {
+    if ($action === 'update-invoice-status' && in_array((string) ($user['role'] ?? ''), ['staff', 'admin'], true)) {
         $result = bani_update_invoice_status($invoiceId, (string) ($_POST['invoice_status'] ?? ''));
         if (($result['success'] ?? false) === true) {
-            $recordMessage = (string) ($result['message'] ?? 'Invoice updated successfully.');
-            $invoice = bani_fetch_invoice_by_id($invoiceId) ?? $invoice;
+            $recordMessage = (string) $result['message'];
+            $invoice = bani_fetch_invoice_by_id($invoiceId);
         } else {
             $recordError = (string) ($result['message'] ?? 'Unable to update invoice.');
+        }
+    } elseif ($action === 'submit-payment-reference' && ($user['role'] ?? '') === 'client') {
+        $result = bani_submit_invoice_payment_reference(
+            $invoiceId,
+            (string) ($_POST['payment_reference'] ?? ''),
+            (string) ($_POST['payment_notes'] ?? '')
+        );
+        if (($result['success'] ?? false) === true) {
+            $recordMessage = (string) $result['message'];
+            $invoice = bani_fetch_invoice_by_id($invoiceId);
+        } else {
+            $recordError = (string) ($result['message'] ?? 'Unable to submit payment reference.');
         }
     }
 }
 
-$deliveryTargets = bani_invoice_delivery_targets($invoice);
-$dashboardUrl = match ($role) {
-    'admin' => 'admin-dashboard.php',
-    'staff' => 'staff-dashboard.php',
-    default => 'client-dashboard.php',
-};
-$created = isset($_GET['created']) && $_GET['created'] === '1';
-$emailSubject = 'Invoice ' . (string) ($invoice['invoice_number'] ?? '') . ' from Bani Global Logistics Limited';
-$emailBody = rawurlencode(
-    "Hello " . (string) ($invoice['client_name'] ?? 'Client') . ",\r\n\r\n"
-    . "Please find your invoice details below:\r\n"
-    . "Invoice Number: " . (string) ($invoice['invoice_number'] ?? '') . "\r\n"
-    . "Tracking Number: " . (string) (($invoice['tracking_reference'] ?? '') !== '' ? $invoice['tracking_reference'] : 'Not linked') . "\r\n"
-    . "Description: " . (string) ($invoice['description'] ?? '') . "\r\n"
-    . "Amount: " . (string) (($invoice['currency'] ?? 'KES') . ' ' . number_format((float) ($invoice['amount'] ?? 0), 2)) . "\r\n"
-    . "Due Date: " . (string) ($invoice['due_date'] ?? '') . "\r\n\r\n"
-    . "Regards,\r\nBani Global Logistics Limited"
-);
-$mailtoLink = 'mailto:' . rawurlencode((string) ($deliveryTargets['client_email'] ?? ''))
-    . '?cc=' . rawurlencode((string) ($deliveryTargets['accounts_email'] ?? ''))
-    . '&subject=' . rawurlencode($emailSubject)
-    . '&body=' . $emailBody;
+$dashboardUrl = ($user['role'] ?? '') === 'admin'
+    ? 'admin-dashboard.php'
+    : (($user['role'] ?? '') === 'staff' ? 'staff-dashboard.php' : 'client-dashboard.php');
+$delivery = bani_invoice_delivery_targets($invoice);
+$trackingReference = (string) ($invoice['tracking_reference'] ?? '');
 ?>
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? 'Invoice'), ENT_QUOTES, 'UTF-8') ?> | Bani Global Logistics Limited</title>
-    <meta name="description" content="Review a logistics invoice, recipient routing, and status from the secure Bani portal.">
+    <title>Invoice View | Bani Global Logistics Limited</title>
+    <meta name="description" content="Invoice view with payment instructions, tracking references, and payment-reference submission.">
     <link rel="stylesheet" href="/css/style.css">
   </head>
   <body class="dashboard-page">
@@ -83,11 +71,7 @@ $mailtoLink = 'mailto:' . rawurlencode((string) ($deliveryTargets['client_email'
         <nav class="site-nav" aria-label="Main navigation">
           <a href="index.html">Home</a>
           <a href="<?= htmlspecialchars($dashboardUrl, ENT_QUOTES, 'UTF-8') ?>">Dashboard</a>
-          <?php if (in_array($role, ['admin', 'staff'], true)): ?>
-            <a href="create-invoice.php">Create Invoice</a>
-            <a href="create-shipment.php">Create Shipment</a>
-          <?php endif; ?>
-          <a class="active" href="invoice-view.php?id=<?= (int) ($invoice['id'] ?? 0) ?>">Invoice View</a>
+          <a class="active" href="invoice-view.php?id=<?= (int) $invoiceId ?>">Invoice View</a>
           <a href="logout.php">Logout</a>
         </nav>
       </div>
@@ -96,43 +80,42 @@ $mailtoLink = 'mailto:' . rawurlencode((string) ($deliveryTargets['client_email'
     <main class="dashboard-shell">
       <section class="dashboard-hero">
         <div>
-          <div class="eyebrow">Invoice detail</div>
+          <div class="eyebrow">Invoice document</div>
           <h1><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></h1>
           <p>
-            Review the final invoice layout, the delivery route to the client, and the internal accounts copy destination from one page.
+            Client: <strong><?= htmlspecialchars((string) ($invoice['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
+            <?php if ($trackingReference !== ''): ?>
+              | Tracking: <strong><?= htmlspecialchars($trackingReference, ENT_QUOTES, 'UTF-8') ?></strong>
+            <?php endif; ?>
+            | Status: <strong><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
           </p>
         </div>
         <div class="dashboard-actions">
           <a class="button secondary" href="<?= htmlspecialchars($dashboardUrl, ENT_QUOTES, 'UTF-8') ?>">Back to Dashboard</a>
-          <?php if (in_array($role, ['admin', 'staff'], true)): ?>
-            <a class="button primary" href="create-invoice.php">New Invoice</a>
+          <?php if ($trackingReference !== ''): ?>
+            <a class="button primary" href="track.html">Track Shipment</a>
           <?php endif; ?>
         </div>
       </section>
 
-      <?php if ($created): ?>
-        <div class="result-box show"><strong>Invoice created.</strong><p>This is the exact invoice record now visible to the client in their portal.</p></div>
-      <?php endif; ?>
       <?php if ($recordError !== ''): ?>
-        <div class="result-box show"><strong>Action failed.</strong><p><?= htmlspecialchars($recordError, ENT_QUOTES, 'UTF-8') ?></p></div>
+        <div class="result-box show result-error"><strong>Action failed.</strong><p><?= htmlspecialchars($recordError, ENT_QUOTES, 'UTF-8') ?></p></div>
       <?php endif; ?>
       <?php if ($recordMessage !== ''): ?>
-        <div class="result-box show"><strong>Action completed.</strong><p><?= htmlspecialchars($recordMessage, ENT_QUOTES, 'UTF-8') ?></p></div>
+        <div class="result-box show result-success"><strong>Action completed.</strong><p><?= htmlspecialchars($recordMessage, ENT_QUOTES, 'UTF-8') ?></p></div>
       <?php endif; ?>
 
-      <section class="detail-layout">
+      <section class="workspace-grid">
         <article class="dashboard-card invoice-document invoice-watermark">
           <div class="invoice-topline">
             <div>
-              <div class="eyebrow">Bani Global Logistics Limited</div>
-              <h2>Logistics Invoice</h2>
-              <p class="muted">Customs brokerage, freight coordination, and cargo handling support.</p>
+              <h2>Bani Global Logistics Limited</h2>
+              <p class="muted">Operations, customs brokerage, sourcing, and global logistics support.</p>
             </div>
             <div class="invoice-meta">
               <strong><?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
-              <span>Issued <?= htmlspecialchars(bani_format_datetime((string) ($invoice['created_at'] ?? null)), ENT_QUOTES, 'UTF-8') ?></span>
+              <span>Issued <?= htmlspecialchars(bani_format_datetime($invoice['created_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></span>
               <span>Due <?= htmlspecialchars((string) ($invoice['due_date'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
-              <span class="badge <?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'badge-green' : 'badge-red' ?>"><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
             </div>
           </div>
 
@@ -143,75 +126,114 @@ $mailtoLink = 'mailto:' . rawurlencode((string) ($deliveryTargets['client_email'
               <p><?= htmlspecialchars((string) ($invoice['client_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
             </div>
             <div class="detail-panel">
-              <h3>Issued By</h3>
-              <p><strong>Bani Global Logistics Limited</strong></p>
-              <p>support@banilogistics.co.ke</p>
-              <p>+254 782 013 236</p>
-            </div>
-            <div class="detail-panel">
-              <h3>Tracking Reference</h3>
-              <p><strong><?= htmlspecialchars((string) (($invoice['tracking_reference'] ?? '') !== '' ? $invoice['tracking_reference'] : 'Not linked'), ENT_QUOTES, 'UTF-8') ?></strong></p>
-              <p><?= (($invoice['tracking_reference'] ?? '') !== '') ? 'Linked shipment tracking number shown to client and accounts team.' : 'No shipment tracking number was linked to this invoice.' ?></p>
+              <h3>Invoice Summary</h3>
+              <p>Status: <strong><?= htmlspecialchars((string) ($invoice['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong></p>
+              <?php if ($trackingReference !== ''): ?>
+                <p>Tracking Number: <strong><?= htmlspecialchars($trackingReference, ENT_QUOTES, 'UTF-8') ?></strong></p>
+              <?php endif; ?>
             </div>
           </div>
 
-          <div class="invoice-line">
-            <div>
-              <strong>Service Description</strong>
-              <p><?= htmlspecialchars((string) ($invoice['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
-            </div>
-            <div class="invoice-amount">
-              <?= htmlspecialchars((string) (($invoice['currency'] ?? 'KES') . ' ' . number_format((float) ($invoice['amount'] ?? 0), 2)), ENT_QUOTES, 'UTF-8') ?>
+          <div class="detail-panel">
+            <h3>Service Description</h3>
+            <p><?= htmlspecialchars((string) ($invoice['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
+            <div class="invoice-line">
+              <span>Total Due</span>
+              <strong class="invoice-amount"><?= htmlspecialchars((string) ($invoice['currency'] ?? 'KES'), ENT_QUOTES, 'UTF-8') ?> <?= number_format((float) ($invoice['amount'] ?? 0), 2) ?></strong>
             </div>
           </div>
 
-          <div class="invoice-total">
-            <span>Total Due</span>
-            <strong><?= htmlspecialchars((string) (($invoice['currency'] ?? 'KES') . ' ' . number_format((float) ($invoice['amount'] ?? 0), 2)), ENT_QUOTES, 'UTF-8') ?></strong>
+          <div class="detail-panel">
+            <h3>Delivery Route</h3>
+            <ul class="dashboard-list">
+              <li><span>Client delivery<br><small>Primary recipient</small></span><span><?= htmlspecialchars((string) ($delivery['client_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+              <li><span>Accounts copy<br><small>Internal follow-up</small></span><span><?= htmlspecialchars((string) ($delivery['accounts_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+            </ul>
           </div>
         </article>
 
-        <aside class="dashboard-card detail-card">
-          <h3>Delivery Route</h3>
-          <ul class="dashboard-list">
-            <li><span>Client Recipient<br><small>Primary invoice destination</small></span><span><?= htmlspecialchars((string) ($deliveryTargets['client_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
-            <li><span>Accounts Copy<br><small>Internal follow-up address</small></span><span><?= htmlspecialchars((string) ($deliveryTargets['accounts_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
-            <li><span>Portal Visibility<br><small>Client dashboard record</small></span><span>Live</span></li>
-          </ul>
-
-          <h3>Email Format Preview</h3>
-          <div class="timeline">
-            <div class="timeline-item">
-              <strong>Subject</strong>
-              <p>Invoice <?= htmlspecialchars((string) ($invoice['invoice_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> from Bani Global Logistics Limited</p>
-            </div>
-            <div class="timeline-item">
-              <strong>Tracking Number</strong>
-              <p><?= htmlspecialchars((string) (($invoice['tracking_reference'] ?? '') !== '' ? $invoice['tracking_reference'] : 'Not linked'), ENT_QUOTES, 'UTF-8') ?></p>
-            </div>
-            <div class="timeline-item">
-              <strong>To</strong>
-              <p><?= htmlspecialchars((string) ($deliveryTargets['client_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
-            </div>
-            <div class="timeline-item">
-              <strong>CC / BCC</strong>
-              <p><?= htmlspecialchars((string) ($deliveryTargets['accounts_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
-            </div>
+        <article class="dashboard-card detail-card">
+          <div class="detail-panel">
+            <h3>How To Pay</h3>
+            <ul class="dashboard-list">
+              <?php if (!empty($invoice['bank_name']) || !empty($invoice['account_name']) || !empty($invoice['account_number'])): ?>
+                <li><span>Bank Transfer<br><small><?= htmlspecialchars((string) ($invoice['bank_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small></span><span><?= htmlspecialchars((string) ($invoice['account_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?> <?= htmlspecialchars((string) ($invoice['account_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+              <?php endif; ?>
+              <?php if (!empty($invoice['bank_branch']) || !empty($invoice['swift_code'])): ?>
+                <li><span>Branch / SWIFT<br><small>For bank settlement</small></span><span><?= htmlspecialchars((string) ($invoice['bank_branch'] ?? ''), ENT_QUOTES, 'UTF-8') ?> <?= htmlspecialchars((string) ($invoice['swift_code'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+              <?php endif; ?>
+              <?php if (!empty($invoice['mpesa_details'])): ?>
+                <li><span>M-Pesa<br><small>Mobile money settlement</small></span><span><?= nl2br(htmlspecialchars((string) $invoice['mpesa_details'], ENT_QUOTES, 'UTF-8')) ?></span></li>
+              <?php endif; ?>
+              <?php if (!empty($invoice['paypal_details'])): ?>
+                <li><span>PayPal<br><small>Online payment route</small></span><span><?= nl2br(htmlspecialchars((string) $invoice['paypal_details'], ENT_QUOTES, 'UTF-8')) ?></span></li>
+              <?php endif; ?>
+              <?php if (!empty($invoice['payment_instructions'])): ?>
+                <li><span>Instructions<br><small>Reference and proof guidance</small></span><span><?= nl2br(htmlspecialchars((string) $invoice['payment_instructions'], ENT_QUOTES, 'UTF-8')) ?></span></li>
+              <?php endif; ?>
+              <?php if (empty($invoice['bank_name']) && empty($invoice['mpesa_details']) && empty($invoice['paypal_details']) && empty($invoice['payment_instructions'])): ?>
+                <li><span>Payment details pending<br><small>Accounts team will share them if needed</small></span><span><?= htmlspecialchars((string) ($delivery['accounts_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+              <?php endif; ?>
+            </ul>
           </div>
 
-          <?php if (in_array($role, ['admin', 'staff'], true)): ?>
-            <h3>Quick Actions</h3>
-            <div class="workflow-card">
-              <a class="button secondary" href="<?= htmlspecialchars($mailtoLink, ENT_QUOTES, 'UTF-8') ?>">Open Email Draft</a>
-              <form method="post" action="invoice-view.php?id=<?= (int) ($invoice['id'] ?? 0) ?>">
+          <?php if (($user['role'] ?? '') === 'client' && strtolower((string) ($invoice['status'] ?? '')) !== 'paid'): ?>
+            <div class="detail-panel">
+              <h3>Submit Payment Reference</h3>
+              <p class="muted">If you settle this invoice outside the platform, paste the payment reference here so our accounts team can verify it.</p>
+              <form method="post">
+                <input type="hidden" name="action" value="submit-payment-reference">
+                <input type="hidden" name="invoice_id" value="<?= (int) $invoiceId ?>">
+                <label>
+                  Payment Reference
+                  <input type="text" name="payment_reference" value="<?= htmlspecialchars((string) ($invoice['payment_reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" placeholder="Bank ref, M-Pesa code, or PayPal transaction ID" required>
+                </label>
+                <label>
+                  Payment Notes
+                  <textarea name="payment_notes" placeholder="Optional note for accounts team"><?= htmlspecialchars((string) ($invoice['payment_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                </label>
+                <button type="submit">Submit Payment Reference</button>
+              </form>
+            </div>
+          <?php endif; ?>
+
+          <?php if (!empty($invoice['payment_reference'])): ?>
+            <div class="detail-panel">
+              <h3>Submitted Payment Reference</h3>
+              <ul class="dashboard-list">
+                <li><span>Reference<br><small>Submitted by client</small></span><span><?= htmlspecialchars((string) ($invoice['payment_reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+                <li><span>Submitted On<br><small>Awaiting confirmation</small></span><span><?= htmlspecialchars(bani_format_datetime($invoice['payment_submitted_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></span></li>
+                <?php if (!empty($invoice['payment_notes'])): ?>
+                  <li><span>Notes<br><small>Client note</small></span><span><?= htmlspecialchars((string) ($invoice['payment_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></li>
+                <?php endif; ?>
+              </ul>
+            </div>
+          <?php endif; ?>
+
+          <?php if (in_array((string) ($user['role'] ?? ''), ['staff', 'admin'], true)): ?>
+            <div class="detail-panel">
+              <h3>Invoice Admin Actions</h3>
+              <form method="post" class="inline-actions">
                 <input type="hidden" name="action" value="update-invoice-status">
+                <input type="hidden" name="invoice_id" value="<?= (int) $invoiceId ?>">
                 <input type="hidden" name="invoice_status" value="<?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'Due' : 'Paid' ?>">
                 <button type="submit"><?= strtolower((string) ($invoice['status'] ?? '')) === 'paid' ? 'Mark Due' : 'Mark Paid' ?></button>
               </form>
             </div>
           <?php endif; ?>
-        </aside>
+
+          <div class="detail-panel">
+            <h3>Email Draft</h3>
+            <p class="muted">Client delivery stays aligned with accounts follow-up.</p>
+            <a
+              class="button secondary"
+              href="mailto:<?= rawurlencode((string) ($delivery['client_email'] ?? '')) ?>?cc=<?= rawurlencode((string) ($delivery['accounts_email'] ?? '')) ?>&subject=<?= rawurlencode('Invoice ' . (string) ($invoice['invoice_number'] ?? '')) ?>&body=<?= rawurlencode('Please find invoice ' . (string) ($invoice['invoice_number'] ?? '') . ($trackingReference !== '' ? ' for shipment ' . $trackingReference : '') . '. Amount due: ' . (string) ($invoice['currency'] ?? 'KES') . ' ' . number_format((float) ($invoice['amount'] ?? 0), 2) . '.') ?>"
+            >Open Email Draft</a>
+          </div>
+        </article>
       </section>
     </main>
+
+    <script src="/js/script.js"></script>
   </body>
 </html>

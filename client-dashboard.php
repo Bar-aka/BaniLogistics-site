@@ -155,7 +155,7 @@ $summary = bani_client_summary($clientEmail);
               <?php else: ?>
                 <?php foreach (array_slice($shipments, 0, 6) as $shipment): ?>
                   <tr>
-                    <td><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><a href="shipment-detail.php?id=<?= (int) ($shipment['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($shipment['reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a></td>
                     <td><?= htmlspecialchars((string) (($shipment['origin'] ?? '') . ' to ' . ($shipment['destination'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
                     <td><span class="badge <?= stripos((string) ($shipment['status'] ?? ''), 'customs') !== false ? 'badge-gold' : 'badge-blue' ?>"><?= htmlspecialchars((string) ($shipment['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></td>
                     <td><?= htmlspecialchars((string) ($shipment['next_step'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
@@ -246,5 +246,6 @@ $summary = bani_client_summary($clientEmail);
     </main>
 
     <a class="whatsapp-float" href="https://wa.me/254782013236" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+    <script src="/js/script.js"></script>
   </body>
 </html>
