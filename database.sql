@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS portal_users (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_login_at DATETIME NULL DEFAULT NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_portal_users_phone (phone),
   INDEX idx_portal_users_role (role),
   INDEX idx_portal_users_status (status)
 );
@@ -104,17 +105,56 @@ CREATE TABLE IF NOT EXISTS portal_incoming_requests (
   origin VARCHAR(190) NOT NULL,
   expected_arrival DATE NULL,
   status VARCHAR(80) NOT NULL DEFAULT 'Submitted',
+  assigned_to VARCHAR(190) NULL,
+  assigned_name VARCHAR(190) NULL,
+  admin_notes TEXT NULL,
   notes TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_portal_incoming_requests_assigned_to (assigned_to),
   INDEX idx_portal_incoming_requests_client_email (client_email),
   INDEX idx_portal_incoming_requests_status (status)
+);
+
+CREATE TABLE IF NOT EXISTS portal_quote_requests (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  request_type VARCHAR(40) NOT NULL,
+  client_email VARCHAR(190) NULL,
+  client_name VARCHAR(190) NOT NULL,
+  phone VARCHAR(60) NULL,
+  shipment_type VARCHAR(80) NULL,
+  origin VARCHAR(190) NULL,
+  destination VARCHAR(190) NULL,
+  mode VARCHAR(80) NULL,
+  weight VARCHAR(80) NULL,
+  product_category VARCHAR(190) NULL,
+  quantity VARCHAR(120) NULL,
+  market VARCHAR(190) NULL,
+  budget VARCHAR(190) NULL,
+  product_details TEXT NULL,
+  notes TEXT NULL,
+  status VARCHAR(80) NOT NULL DEFAULT 'Submitted',
+  assigned_to VARCHAR(190) NULL,
+  assigned_name VARCHAR(190) NULL,
+  admin_notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_portal_quote_requests_assigned_to (assigned_to),
+  INDEX idx_portal_quote_requests_request_type (request_type),
+  INDEX idx_portal_quote_requests_status (status),
+  INDEX idx_portal_quote_requests_email (client_email)
 );
 
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(190) NULL AFTER client_name;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190) NULL AFTER assigned_to;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT NULL AFTER next_step;
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS incoming_request_id INT UNSIGNED NULL AFTER client_name;
+ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(190) NULL AFTER status;
+ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190) NULL AFTER assigned_to;
+ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS admin_notes TEXT NULL AFTER assigned_name;
+ALTER TABLE portal_quote_requests ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(190) NULL AFTER status;
+ALTER TABLE portal_quote_requests ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190) NULL AFTER assigned_to;
+ALTER TABLE portal_quote_requests ADD COLUMN IF NOT EXISTS admin_notes TEXT NULL AFTER assigned_name;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS tracking_reference VARCHAR(40) NULL AFTER client_name;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS bank_name VARCHAR(190) NULL AFTER due_date;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS account_name VARCHAR(190) NULL AFTER bank_name;

@@ -44,6 +44,7 @@
               Share your cargo, route, and preferred mode so we can prepare a transport, customs, and handling estimate.
             </p>
             <form id="shippingQuoteForm">
+              <input type="hidden" name="request_type" value="shipping">
               <div class="form-grid">
                 <label>
                   Full Name
@@ -51,14 +52,14 @@
                 </label>
                 <label>
                   Email Address
-                  <input type="email" name="email" placeholder="Email Address" required>
+                  <input type="email" name="email" placeholder="Optional email">
                 </label>
               </div>
 
               <div class="form-grid">
                 <label>
                   Phone Number
-                  <input type="text" name="phone" placeholder="Phone Number">
+                  <input type="text" name="phone" placeholder="WhatsApp Number" required>
                 </label>
                 <label>
                   Shipment Type
@@ -113,6 +114,7 @@
               Use this when you want us to help source the goods before shipping. Share what you need and we will advise on the key specifications required to proceed.
             </p>
             <form id="sourcingQuoteForm">
+              <input type="hidden" name="request_type" value="sourcing">
               <div class="form-grid">
                 <label>
                   Full Name
@@ -120,14 +122,14 @@
                 </label>
                 <label>
                   Email Address
-                  <input type="email" name="email" placeholder="Email Address" required>
+                  <input type="email" name="email" placeholder="Optional email">
                 </label>
               </div>
 
               <div class="form-grid">
                 <label>
                   Phone Number
-                  <input type="text" name="phone" placeholder="Phone Number">
+                  <input type="text" name="phone" placeholder="WhatsApp Number" required>
                 </label>
                 <label>
                   Target Delivery Country

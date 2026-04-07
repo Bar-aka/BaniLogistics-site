@@ -42,12 +42,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'update-incoming-status') {
         $requestId = (int) ($_POST['request_id'] ?? 0);
-        $incomingStatus = (string) ($_POST['incoming_status'] ?? '');
-        $result = bani_update_incoming_request_status($requestId, $incomingStatus);
+        $result = bani_update_incoming_request_status($requestId, $_POST);
         if (($result['success'] ?? false) === true) {
             $recordMessage = (string) $result['message'];
         } else {
             $recordError = (string) ($result['message'] ?? 'Unable to update incoming cargo request.');
+        }
+    } elseif ($action === 'update-quote-request') {
+        $requestId = (int) ($_POST['request_id'] ?? 0);
+        $result = bani_update_quote_request($requestId, $_POST);
+        if (($result['success'] ?? false) === true) {
+            $recordMessage = (string) $result['message'];
+        } else {
+            $recordError = (string) ($result['message'] ?? 'Unable to update quote request.');
         }
     } elseif ($action === 'convert-incoming') {
         $requestId = (int) ($_POST['request_id'] ?? 0);
@@ -66,6 +73,7 @@ $clientAccounts = bani_list_users('client');
 $storageMode = bani_db_ready() && bani_db() instanceof PDO ? 'MySQL Database' : 'Local Account Storage';
 $shipments = bani_fetch_shipments(null, 12);
 $quotes = bani_fetch_quotes(null, 8);
+$quoteRequests = bani_fetch_quote_requests(8);
 $invoices = bani_fetch_invoices(null, 8);
 $incomingRequests = bani_fetch_incoming_requests(null, 8);
 $staffUsers = bani_staff_users();
@@ -77,6 +85,8 @@ $outstandingValue = array_reduce($invoices, static function (float $carry, array
 }, 0.0);
 $activeIncoming = count(array_filter($incomingRequests, static fn(array $request): bool => strtolower((string) ($request['status'] ?? 'submitted')) !== 'closed'));
 $assignedShipments = count(array_filter($shipments, static fn(array $shipment): bool => trim((string) ($shipment['assigned_to'] ?? '')) !== ''));
+$assignedQuoteRequests = count(array_filter($quoteRequests, static fn(array $request): bool => trim((string) ($request['assigned_to'] ?? '')) !== ''));
+$assignedIncomingRequests = count(array_filter($incomingRequests, static fn(array $request): bool => trim((string) ($request['assigned_to'] ?? '')) !== ''));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -146,6 +156,7 @@ $assignedShipments = count(array_filter($shipments, static fn(array $shipment): 
             </thead>
             <tbody>
               <tr><td>Open Quotes</td><td><?= count($quotes) ?></td><td><span class="badge badge-blue">Live</span></td></tr>
+              <tr><td>Quote Requests</td><td><?= count($quoteRequests) ?></td><td><span class="badge badge-blue">Review</span></td></tr>
               <tr><td>Invoices Due</td><td><?= $dueInvoices ?></td><td><span class="badge <?= $dueInvoices > 0 ? 'badge-gold' : 'badge-green' ?>"><?= $dueInvoices > 0 ? 'Review' : 'Clear' ?></span></td></tr>
               <tr><td>Shipments in Customs</td><td><?= $customsShipments ?></td><td><span class="badge <?= $customsShipments > 0 ? 'badge-gold' : 'badge-green' ?>"><?= $customsShipments > 0 ? 'Active' : 'Clear' ?></span></td></tr>
               <tr><td>Delivered Shipments</td><td><?= $deliveredShipments ?></td><td><span class="badge badge-green">Completed</span></td></tr>
@@ -157,9 +168,79 @@ $assignedShipments = count(array_filter($shipments, static fn(array $shipment): 
           <h3>Leadership Priorities</h3>
           <div class="timeline">
             <div class="timeline-item"><strong><?= $activeIncoming ?> incoming alerts need intake review</strong><p>Convert client supplier references into shipment records as soon as origin, destination, and mode are confirmed.</p></div>
+            <div class="timeline-item"><strong><?= count($quoteRequests) ?> client quote requests are waiting</strong><p>Shipping and sourcing requests from the public quote page now need commercial review in the admin queue.</p></div>
             <div class="timeline-item"><strong><?= $assignedShipments ?> shipments already have owners</strong><p>Use the shipment detail pages to keep status history and ownership accurate.</p></div>
             <div class="timeline-item"><strong><?= $dueInvoices ?> invoices remain open</strong><p>Accounts follow-up stays easier when invoice status is updated promptly.</p></div>
           </div>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card">
+          <h2>Quote Request Inbox</h2>
+          <p class="dashboard-subtitle">Requests submitted from the Request Quote page land here for commercial follow-up.</p>
+          <table class="dashboard-table">
+            <thead>
+              <tr><th>Type</th><th>Client</th><th>Route / Need</th><th>Ownership</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              <?php if ($quoteRequests === []): ?>
+                <tr><td colspan="5">No quote requests have been submitted yet.</td></tr>
+              <?php else: ?>
+                <?php foreach ($quoteRequests as $request): ?>
+                  <tr>
+                    <td><span class="badge badge-blue"><?= htmlspecialchars(ucfirst((string) ($request['request_type'] ?? 'Request')), ENT_QUOTES, 'UTF-8') ?></span></td>
+                    <td>
+                      <?= htmlspecialchars((string) ($request['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
+                      <small><?= htmlspecialchars((string) (($request['client_email'] ?? '') !== '' ? $request['client_email'] : ($request['phone'] ?? '')), ENT_QUOTES, 'UTF-8') ?></small>
+                    </td>
+                    <td>
+                      <?php if (($request['request_type'] ?? '') === 'shipping'): ?>
+                        <?= htmlspecialchars((string) (($request['origin'] ?? '') . ' to ' . ($request['destination'] ?? '')), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($request['mode'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
+                      <?php else: ?>
+                        <?= htmlspecialchars((string) ($request['product_category'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br><small><?= htmlspecialchars((string) ($request['quantity'] ?? ''), ENT_QUOTES, 'UTF-8') ?> <?= htmlspecialchars((string) ($request['market'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
+                      <?php endif; ?>
+                    </td>
+                    <td>
+                      <?= htmlspecialchars((string) ($request['assigned_name'] ?? 'Unassigned'), ENT_QUOTES, 'UTF-8') ?><br>
+                      <small><?= htmlspecialchars((string) ($request['status'] ?? 'Submitted'), ENT_QUOTES, 'UTF-8') ?></small>
+                    </td>
+                    <td>
+                      <form method="post" action="admin-dashboard.php" class="inline-form-stack">
+                        <input type="hidden" name="action" value="update-quote-request">
+                        <input type="hidden" name="request_id" value="<?= (int) ($request['id'] ?? 0) ?>">
+                        <select name="quote_status">
+                          <?php foreach (['Submitted', 'Reviewing', 'Quoted', 'Assigned', 'Closed'] as $statusOption): ?>
+                            <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"<?= (($request['status'] ?? '') === $statusOption) ? ' selected' : '' ?>><?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                        <select name="assigned_to">
+                          <option value="">Unassigned</option>
+                          <?php foreach ($staffUsers as $staffUser): ?>
+                            <option value="<?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"<?= (($request['assigned_to'] ?? '') === ($staffUser['email'] ?? '')) ? ' selected' : '' ?>>
+                              <?= htmlspecialchars((string) ($staffUser['name'] ?? $staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                        <textarea name="admin_notes" placeholder="Internal follow-up note"><?= htmlspecialchars((string) ($request['admin_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <button type="submit">Save</button>
+                      </form>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </article>
+
+        <article class="dashboard-card">
+          <h3>Commercial Follow-Up Notes</h3>
+          <ul class="dashboard-list">
+            <li><span>Shipping quotes<br><small>Origin, destination, mode, and weight are captured from the public form</small></span><span><?= count(array_filter($quoteRequests, static fn(array $request): bool => ($request['request_type'] ?? '') === 'shipping')) ?></span></li>
+            <li><span>Sourcing requests<br><small>Product category, quantity, market, budget, and details are captured</small></span><span><?= count(array_filter($quoteRequests, static fn(array $request): bool => ($request['request_type'] ?? '') === 'sourcing')) ?></span></li>
+            <li><span>Assigned requests<br><small>Commercial ownership already placed on a team member</small></span><span><?= $assignedQuoteRequests ?></span></li>
+            <li><span>Action path<br><small>Issue a formal quote after review</small></span><span>Create quote</span></li>
+          </ul>
         </article>
       </section>
 
@@ -217,13 +298,26 @@ $assignedShipments = count(array_filter($shipments, static fn(array $shipment): 
               <li>
                 <span>
                   <?= htmlspecialchars((string) ($incoming['supplier_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
-                  <small><?= htmlspecialchars((string) ($incoming['supplier_tracking_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars((string) ($incoming['origin'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
+                  <small><?= htmlspecialchars((string) ($incoming['supplier_tracking_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars((string) ($incoming['origin'] ?? ''), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars((string) ($incoming['assigned_name'] ?? 'Unassigned'), ENT_QUOTES, 'UTF-8') ?></small>
                 </span>
-                <form method="post" action="admin-dashboard.php" class="inline-actions">
+                <form method="post" action="admin-dashboard.php" class="inline-form-stack">
                   <input type="hidden" name="action" value="update-incoming-status">
                   <input type="hidden" name="request_id" value="<?= (int) ($incoming['id'] ?? 0) ?>">
-                  <input type="hidden" name="incoming_status" value="<?= strtolower((string) ($incoming['status'] ?? '')) === 'closed' ? 'Reviewing' : 'Closed' ?>">
-                  <button type="submit"><?= strtolower((string) ($incoming['status'] ?? '')) === 'closed' ? 'Reopen' : 'Close' ?></button>
+                  <select name="incoming_status">
+                    <?php foreach (['Submitted', 'Reviewing', 'Shipment Opened', 'Closed'] as $statusOption): ?>
+                      <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"<?= (($incoming['status'] ?? '') === $statusOption) ? ' selected' : '' ?>><?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <select name="assigned_to">
+                    <option value="">Unassigned</option>
+                    <?php foreach ($staffUsers as $staffUser): ?>
+                      <option value="<?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"<?= (($incoming['assigned_to'] ?? '') === ($staffUser['email'] ?? '')) ? ' selected' : '' ?>>
+                        <?= htmlspecialchars((string) ($staffUser['name'] ?? $staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                  <textarea name="admin_notes" placeholder="Internal intake note"><?= htmlspecialchars((string) ($incoming['admin_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                  <button type="submit">Save</button>
                 </form>
               </li>
             <?php endforeach; ?>
@@ -286,12 +380,14 @@ $assignedShipments = count(array_filter($shipments, static fn(array $shipment): 
           <ul class="dashboard-list">
             <?php foreach ($staffUsers as $staffUser): ?>
               <?php $owned = array_filter($shipments, static fn(array $shipment): bool => ($shipment['assigned_to'] ?? '') === ($staffUser['email'] ?? '')); ?>
+              <?php $ownedQuotes = array_filter($quoteRequests, static fn(array $request): bool => ($request['assigned_to'] ?? '') === ($staffUser['email'] ?? '')); ?>
+              <?php $ownedIncoming = array_filter($incomingRequests, static fn(array $request): bool => ($request['assigned_to'] ?? '') === ($staffUser['email'] ?? '')); ?>
               <li>
                 <span>
                   <?= htmlspecialchars((string) ($staffUser['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
                   <small><?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
                 </span>
-                <span><?= count($owned) ?> active tasks</span>
+                <span><?= count($owned) + count($ownedQuotes) + count($ownedIncoming) ?> active tasks</span>
               </li>
             <?php endforeach; ?>
             <?php if ($staffUsers === []): ?>

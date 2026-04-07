@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <section class="dashboard-grid">
         <article class="dashboard-card">
           <h2>Client Account Setup</h2>
-          <p class="dashboard-subtitle">Complete the form below to activate your portal access.</p>
+          <p class="dashboard-subtitle">Complete the form below to activate your portal access using email, WhatsApp number, or both.</p>
           <?php if ($error !== ''): ?>
             <div class="result-box show"><strong>Registration failed.</strong><p><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p></div>
           <?php endif; ?>
@@ -84,12 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               </label>
               <label>
                 Email Address
-                <input type="email" name="email" value="<?= htmlspecialchars($form['email'], ENT_QUOTES, 'UTF-8') ?>" required>
+                <input type="email" name="email" value="<?= htmlspecialchars($form['email'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Optional">
               </label>
             </div>
             <div class="form-grid">
               <label>
-                Phone Number
+                WhatsApp Number
                 <input type="text" name="phone" value="<?= htmlspecialchars($form['phone'], ENT_QUOTES, 'UTF-8') ?>" required>
               </label>
               <label>
@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit">Create Client Account</button>
           </form>
           <p class="dashboard-subtitle" style="margin-top:18px;">
-            Already registered? <a href="login.php?role=client">Sign in to the client portal</a>.
+            Already registered? <a href="login.php?role=client">Sign in to the client portal</a> with your email or WhatsApp number.
           </p>
         </article>
 

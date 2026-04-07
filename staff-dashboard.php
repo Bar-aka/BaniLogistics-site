@@ -36,6 +36,7 @@ $shipments = bani_fetch_shipments(null, 12);
 $quotes = bani_fetch_quotes(null, 6);
 $invoices = bani_fetch_invoices(null, 6);
 $incomingRequests = bani_fetch_incoming_requests(null, 6);
+$quoteRequests = bani_fetch_quote_requests(8);
 $myEmail = (string) ($user['email'] ?? '');
 $myShipments = array_values(array_filter(
     $shipments,
@@ -48,6 +49,14 @@ $customsShipments = array_values(array_filter(
 $pendingInvoices = array_values(array_filter(
     $invoices,
     static fn(array $invoice): bool => strtolower((string) ($invoice['status'] ?? '')) !== 'paid'
+));
+$myIncomingRequests = array_values(array_filter(
+    $incomingRequests,
+    static fn(array $request): bool => strtolower((string) ($request['assigned_to'] ?? '')) === strtolower($myEmail)
+));
+$myQuoteRequests = array_values(array_filter(
+    $quoteRequests,
+    static fn(array $request): bool => strtolower((string) ($request['assigned_to'] ?? '')) === strtolower($myEmail)
 ));
 ?>
 <!DOCTYPE html>
@@ -98,7 +107,7 @@ $pendingInvoices = array_values(array_filter(
         <article class="dashboard-stat"><strong><?= count($myShipments) ?></strong><span>My assigned shipments</span></article>
         <article class="dashboard-stat"><strong><?= count($customsShipments) ?></strong><span>Customs queue</span></article>
         <article class="dashboard-stat"><strong><?= count($pendingInvoices) ?></strong><span>Invoices awaiting follow-up</span></article>
-        <article class="dashboard-stat"><strong><?= count($incomingRequests) ?></strong><span>Incoming supplier alerts</span></article>
+        <article class="dashboard-stat"><strong><?= count($myIncomingRequests) + count($myQuoteRequests) ?></strong><span>Assigned requests</span></article>
       </section>
 
       <?php if ($recordError !== ''): ?>
@@ -133,6 +142,35 @@ $pendingInvoices = array_values(array_filter(
           </table>
         </article>
 
+        <article class="dashboard-card">
+          <h3>Commercial And Intake Queue</h3>
+          <ul class="dashboard-list">
+            <?php foreach (array_slice($myQuoteRequests, 0, 3) as $request): ?>
+              <li>
+                <span>
+                  <?= htmlspecialchars((string) ($request['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
+                  <small><?= htmlspecialchars(ucfirst((string) ($request['request_type'] ?? 'request')), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars((string) ($request['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
+                </span>
+                <span><?= htmlspecialchars((string) (($request['client_email'] ?? '') !== '' ? $request['client_email'] : ($request['phone'] ?? '')), ENT_QUOTES, 'UTF-8') ?></span>
+              </li>
+            <?php endforeach; ?>
+            <?php foreach (array_slice($myIncomingRequests, 0, 3) as $request): ?>
+              <li>
+                <span>
+                  <?= htmlspecialchars((string) ($request['supplier_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
+                  <small><?= htmlspecialchars((string) ($request['supplier_tracking_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars((string) ($request['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
+                </span>
+                <span><?= htmlspecialchars((string) ($request['client_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+              </li>
+            <?php endforeach; ?>
+            <?php if ($myQuoteRequests === [] && $myIncomingRequests === []): ?>
+              <li><span>No quote or intake requests assigned yet<br><small>Requests assigned by admin will appear here.</small></span><span class="badge badge-green">Clear</span></li>
+            <?php endif; ?>
+          </ul>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
         <article class="dashboard-card">
           <h3>Customs And Delivery Queue</h3>
           <ul class="dashboard-list">

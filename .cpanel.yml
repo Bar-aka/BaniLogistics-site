@@ -10,6 +10,7 @@ deployment:
     - /bin/cp -R migrate-users.php $DEPLOYPATH
     - /bin/cp -R privacy.html $DEPLOYPATH
     - /bin/cp -R quote.html $DEPLOYPATH
+    - /bin/cp -R quote-request.php $DEPLOYPATH
     - /bin/cp -R register.php $DEPLOYPATH
     - /bin/cp -R terms.html $DEPLOYPATH
     - /bin/cp -R track.html $DEPLOYPATH

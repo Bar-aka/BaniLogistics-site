@@ -28,7 +28,7 @@ function bani_seed_users(): array
         [
             'email' => 'client@banilogistics.co.ke',
             'name' => 'Client Account',
-            'phone' => '+254 782 013 236',
+            'phone' => '+254701000101',
             'company' => 'Bani Client Account',
             'role' => 'client',
             'status' => 'active',
@@ -39,7 +39,7 @@ function bani_seed_users(): array
         [
             'email' => 'ops@banilogistics.co.ke',
             'name' => 'Operations Team',
-            'phone' => '+254 782 013 236',
+            'phone' => '+254701000102',
             'company' => 'Bani Global Logistics Limited',
             'role' => 'staff',
             'status' => 'active',
@@ -50,7 +50,7 @@ function bani_seed_users(): array
         [
             'email' => 'admin@banilogistics.co.ke',
             'name' => 'Admin Account',
-            'phone' => '+254 782 013 236',
+            'phone' => '+254701000103',
             'company' => 'Bani Global Logistics Limited',
             'role' => 'admin',
             'status' => 'active',
@@ -66,7 +66,7 @@ function bani_normalize_user(array $user): array
     return [
         'email' => strtolower(trim((string) ($user['email'] ?? ''))),
         'name' => trim((string) ($user['name'] ?? '')),
-        'phone' => trim((string) ($user['phone'] ?? '')),
+        'phone' => bani_normalize_phone((string) ($user['phone'] ?? '')),
         'company' => trim((string) ($user['company'] ?? '')),
         'role' => in_array(($user['role'] ?? ''), BANI_ALLOWED_ROLES, true) ? (string) $user['role'] : 'client',
         'status' => in_array(($user['status'] ?? ''), BANI_ALLOWED_STATUSES, true) ? (string) $user['status'] : 'active',
@@ -74,6 +74,37 @@ function bani_normalize_user(array $user): array
         'created_at' => (string) ($user['created_at'] ?? gmdate('Y-m-d H:i:s')),
         'last_login_at' => $user['last_login_at'] ?? null,
     ];
+}
+
+function bani_normalize_phone(string $phone): string
+{
+    $clean = preg_replace('/[^0-9+]/', '', trim($phone)) ?? '';
+
+    if ($clean === '') {
+        return '';
+    }
+
+    if (str_starts_with($clean, '00')) {
+        $clean = '+' . substr($clean, 2);
+    }
+
+    if (str_starts_with($clean, '0')) {
+        $clean = '+254' . substr($clean, 1);
+    }
+
+    if (!str_starts_with($clean, '+') && preg_match('/^\d+$/', $clean) === 1) {
+        $clean = '+' . $clean;
+    }
+
+    return $clean;
+}
+
+function bani_internal_email_for_phone(string $phone): string
+{
+    $phone = bani_normalize_phone($phone);
+    $token = preg_replace('/[^0-9]/', '', $phone) ?? '';
+
+    return 'client-' . $token . '@clients.banilogistics.local';
 }
 
 function bani_db_ready(): bool
@@ -166,6 +197,23 @@ function bani_find_user_index(string $email, array $users): ?int
     return null;
 }
 
+function bani_find_user_index_by_phone(string $phone, array $users): ?int
+{
+    $needle = bani_normalize_phone($phone);
+
+    if ($needle === '') {
+        return null;
+    }
+
+    foreach ($users as $index => $user) {
+        if (bani_normalize_phone((string) ($user['phone'] ?? '')) === $needle) {
+            return $index;
+        }
+    }
+
+    return null;
+}
+
 function bani_load_users(): array
 {
     $pdo = bani_db();
@@ -219,12 +267,22 @@ function bani_upsert_db_user(array $user): bool
 
 function bani_find_user(string $email): ?array
 {
-    $email = strtolower(trim($email));
+    $identifier = trim($email);
+    $email = strtolower($identifier);
+    $phone = bani_normalize_phone($identifier);
     $pdo = bani_db();
 
     if ($pdo instanceof PDO) {
-        $statement = $pdo->prepare('SELECT email, name, phone, company, role, status, password_hash, created_at, last_login_at FROM portal_users WHERE email = :email LIMIT 1');
-        $statement->execute([':email' => $email]);
+        $statement = $pdo->prepare(
+            'SELECT email, name, phone, company, role, status, password_hash, created_at, last_login_at
+             FROM portal_users
+             WHERE email = :email OR phone = :phone
+             LIMIT 1'
+        );
+        $statement->execute([
+            ':email' => $email,
+            ':phone' => $phone,
+        ]);
         $row = $statement->fetch();
 
         return is_array($row) ? bani_normalize_user($row) : null;
@@ -233,7 +291,31 @@ function bani_find_user(string $email): ?array
     $users = bani_load_file_users();
     $index = bani_find_user_index($email, $users);
 
+    if ($index === null) {
+        $index = bani_find_user_index_by_phone($phone, $users);
+    }
+
     return $index === null ? null : $users[$index];
+}
+
+function bani_find_user_for_role(string $identifier, string $role): ?array
+{
+    $matches = array_values(array_filter(
+        bani_load_users(),
+        static function (array $user) use ($identifier, $role): bool {
+            if (($user['role'] ?? '') !== $role) {
+                return false;
+            }
+
+            $normalizedIdentifier = strtolower(trim($identifier));
+            $normalizedPhone = bani_normalize_phone($identifier);
+
+            return ($user['email'] ?? '') === $normalizedIdentifier
+                || bani_normalize_phone((string) ($user['phone'] ?? '')) === $normalizedPhone;
+        }
+    ));
+
+    return $matches[0] ?? null;
 }
 
 function bani_current_user(): ?array
@@ -273,17 +355,13 @@ function bani_dashboard_url(string $role): string
     };
 }
 
-function bani_login(string $email, string $password, string $role): array
+function bani_login(string $identifier, string $password, string $role): array
 {
-    $email = strtolower(trim($email));
-    $user = bani_find_user($email);
+    $identifier = trim($identifier);
+    $user = bani_find_user_for_role($identifier, $role);
 
     if ($user === null) {
         return ['success' => false, 'message' => 'No account was found with those details.'];
-    }
-
-    if (($user['role'] ?? '') !== $role) {
-        return ['success' => false, 'message' => 'The selected role does not match this account.'];
     }
 
     if (($user['status'] ?? 'active') !== 'active') {
@@ -291,10 +369,11 @@ function bani_login(string $email, string $password, string $role): array
     }
 
     if (!password_verify($password, (string) ($user['password_hash'] ?? ''))) {
-        return ['success' => false, 'message' => 'Invalid email or password.'];
+        return ['success' => false, 'message' => 'Invalid login details. Please confirm your email, WhatsApp number, password, and role.'];
     }
 
     $lastLoginAt = gmdate('Y-m-d H:i:s');
+    $email = strtolower((string) ($user['email'] ?? ''));
 
     if (bani_db_ready() && bani_db() instanceof PDO) {
         $updatedUser = $user;
@@ -329,17 +408,21 @@ function bani_register_client(array $input): array
 {
     $name = trim((string) ($input['name'] ?? ''));
     $email = strtolower(trim((string) ($input['email'] ?? '')));
-    $phone = trim((string) ($input['phone'] ?? ''));
+    $phone = bani_normalize_phone((string) ($input['phone'] ?? ''));
     $company = trim((string) ($input['company'] ?? ''));
     $password = (string) ($input['password'] ?? '');
     $confirmPassword = (string) ($input['confirm_password'] ?? '');
 
-    if ($name === '' || $email === '' || $phone === '' || $company === '' || $password === '' || $confirmPassword === '') {
-        return ['success' => false, 'message' => 'Please complete all registration fields.'];
+    if ($name === '' || $phone === '' || $company === '' || $password === '' || $confirmPassword === '') {
+        return ['success' => false, 'message' => 'Please complete the client name, WhatsApp number, company, and password fields.'];
     }
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         return ['success' => false, 'message' => 'Please provide a valid email address.'];
+    }
+
+    if ($phone === '') {
+        return ['success' => false, 'message' => 'Please provide a valid WhatsApp or phone number.'];
     }
 
     if (strlen($password) < 8) {
@@ -350,8 +433,16 @@ function bani_register_client(array $input): array
         return ['success' => false, 'message' => 'Passwords do not match.'];
     }
 
-    if (bani_find_user($email) !== null) {
+    if ($email !== '' && bani_find_user($email) !== null) {
         return ['success' => false, 'message' => 'An account with that email already exists.'];
+    }
+
+    if (bani_find_user($phone) !== null) {
+        return ['success' => false, 'message' => 'An account with that WhatsApp number already exists.'];
+    }
+
+    if ($email === '') {
+        $email = bani_internal_email_for_phone($phone);
     }
 
     $newUser = [
@@ -374,7 +465,7 @@ function bani_register_client(array $input): array
         bani_save_file_users($users);
     }
 
-    return ['success' => true, 'message' => 'Your portal account has been created. You can now sign in.'];
+    return ['success' => true, 'message' => 'Your portal account has been created. You can now sign in with your email or WhatsApp number.'];
 }
 
 function bani_logout(): void

@@ -16,12 +16,12 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = $_POST['email'] ?? '';
+    $identifier = $_POST['identifier'] ?? '';
     $password = $_POST['password'] ?? '';
     $role = $_POST['role'] ?? 'client';
     $role = in_array($role, $allowedRoles, true) ? $role : 'client';
 
-    $result = bani_login($email, $password, $role);
+    $result = bani_login($identifier, $password, $role);
 
     if (($result['success'] ?? false) === true) {
         header('Location: ' . bani_dashboard_url($role));
@@ -102,8 +102,8 @@ if ($currentUser) {
           <form method="post" action="login.php?role=<?= htmlspecialchars($role, ENT_QUOTES, 'UTF-8') ?>">
             <div class="form-grid">
               <label>
-                Email Address
-                <input type="email" name="email" placeholder="you@example.com" required>
+                Email Address Or WhatsApp Number
+                <input type="text" name="identifier" placeholder="you@example.com or +2547..." required>
               </label>
               <label>
                 Role
@@ -139,7 +139,7 @@ if ($currentUser) {
             <li><span>Admin Access<br><small>Management credentials</small></span><span class="badge badge-green">Control</span></li>
           </ul>
           <p class="dashboard-subtitle" style="margin-top:18px;">
-            Customers can register directly for portal access, while staff and admin accounts are maintained internally.
+            Clients can sign in using either their email address or WhatsApp number, while staff and admin accounts are maintained internally.
           </p>
         </article>
       </section>

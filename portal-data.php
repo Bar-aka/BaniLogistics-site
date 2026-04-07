@@ -245,7 +245,7 @@ function bani_fetch_incoming_requests(?string $clientEmail = null, int $limit = 
 
     if ($clientEmail !== null) {
         $statement = $pdo->prepare(
-            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, notes, created_at, updated_at
+            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, admin_notes, notes, created_at, updated_at
              FROM portal_incoming_requests
              WHERE client_email = :client_email
              ORDER BY created_at DESC
@@ -254,7 +254,7 @@ function bani_fetch_incoming_requests(?string $clientEmail = null, int $limit = 
         $statement->execute([':client_email' => strtolower(trim($clientEmail))]);
     } else {
         $statement = $pdo->query(
-            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, notes, created_at, updated_at
+            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, admin_notes, notes, created_at, updated_at
              FROM portal_incoming_requests
              ORDER BY created_at DESC
              LIMIT {$limit}"
@@ -275,7 +275,7 @@ function bani_fetch_incoming_request_by_id(int $requestId): ?array
     }
 
     $statement = $pdo->prepare(
-        'SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, notes, created_at, updated_at
+        'SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, admin_notes, notes, created_at, updated_at
          FROM portal_incoming_requests
          WHERE id = :id
          LIMIT 1'
@@ -284,6 +284,26 @@ function bani_fetch_incoming_request_by_id(int $requestId): ?array
     $row = $statement->fetch();
 
     return is_array($row) ? $row : null;
+}
+
+function bani_fetch_quote_requests(int $limit = 20): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_quote_requests')) {
+        return [];
+    }
+
+    $limit = max(1, min($limit, 100));
+    $statement = $pdo->query(
+        "SELECT id, request_type, client_email, client_name, phone, shipment_type, origin, destination, mode, weight, product_category, quantity, market, budget, product_details, notes, status, assigned_to, assigned_name, admin_notes, created_at, updated_at
+         FROM portal_quote_requests
+         ORDER BY created_at DESC
+         LIMIT {$limit}"
+    );
+    $rows = $statement->fetchAll();
+
+    return is_array($rows) ? $rows : [];
 }
 
 function bani_fetch_shipment_updates(int $shipmentId): array
@@ -359,9 +379,9 @@ function bani_create_incoming_request(string $clientEmail, array $input): array
 
     $statement = $pdo->prepare(
         'INSERT INTO portal_incoming_requests
-         (client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, notes, created_at, updated_at)
+         (client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, admin_notes, notes, created_at, updated_at)
          VALUES
-         (:client_email, :client_name, :supplier_name, :supplier_tracking_number, :item_description, :origin, :expected_arrival, :status, :notes, :created_at, :updated_at)'
+         (:client_email, :client_name, :supplier_name, :supplier_tracking_number, :item_description, :origin, :expected_arrival, :status, :assigned_to, :assigned_name, :admin_notes, :notes, :created_at, :updated_at)'
     );
 
     $timestamp = gmdate('Y-m-d H:i:s');
@@ -375,6 +395,9 @@ function bani_create_incoming_request(string $clientEmail, array $input): array
         ':origin' => $origin,
         ':expected_arrival' => $expectedArrival !== '' ? $expectedArrival : null,
         ':status' => 'Submitted',
+        ':assigned_to' => null,
+        ':assigned_name' => null,
+        ':admin_notes' => null,
         ':notes' => $notes !== '' ? $notes : null,
         ':created_at' => $timestamp,
         ':updated_at' => $timestamp,
@@ -386,7 +409,7 @@ function bani_create_incoming_request(string $clientEmail, array $input): array
     ];
 }
 
-function bani_update_incoming_request_status(int $requestId, string $status): array
+function bani_update_incoming_request_status(int $requestId, array|string $input): array
 {
     $pdo = bani_db();
 
@@ -394,25 +417,166 @@ function bani_update_incoming_request_status(int $requestId, string $status): ar
         return ['success' => false, 'message' => 'Incoming cargo intake is not ready yet.'];
     }
 
-    $status = trim($status);
+    if (is_array($input)) {
+        $status = trim((string) ($input['incoming_status'] ?? $input['status'] ?? ''));
+        $assignedTo = strtolower(trim((string) ($input['assigned_to'] ?? '')));
+        $adminNotes = trim((string) ($input['admin_notes'] ?? ''));
+    } else {
+        $status = trim($input);
+        $assignedTo = '';
+        $adminNotes = '';
+    }
+
     if ($requestId <= 0 || $status === '') {
         return ['success' => false, 'message' => 'A valid incoming request and status are required.'];
+    }
+
+    $assignedName = null;
+    if ($assignedTo !== '') {
+        $staff = bani_find_user($assignedTo);
+        if ($staff === null || !in_array((string) ($staff['role'] ?? ''), ['staff', 'admin'], true)) {
+            return ['success' => false, 'message' => 'Select a valid staff or admin account for assignment.'];
+        }
+        $assignedName = (string) ($staff['name'] ?? $assignedTo);
     }
 
     $statement = $pdo->prepare(
         'UPDATE portal_incoming_requests
          SET status = :status,
+             assigned_to = :assigned_to,
+             assigned_name = :assigned_name,
+             admin_notes = :admin_notes,
              updated_at = :updated_at
          WHERE id = :id'
     );
 
     $statement->execute([
         ':status' => $status,
+        ':assigned_to' => $assignedTo !== '' ? $assignedTo : null,
+        ':assigned_name' => $assignedName,
+        ':admin_notes' => $adminNotes !== '' ? $adminNotes : null,
         ':updated_at' => gmdate('Y-m-d H:i:s'),
         ':id' => $requestId,
     ]);
 
     return ['success' => true, 'message' => 'Incoming cargo status updated successfully.'];
+}
+
+function bani_create_quote_request(array $input): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_quote_requests')) {
+        return ['success' => false, 'message' => 'Quote request intake is not ready yet.'];
+    }
+
+    $requestType = strtolower(trim((string) ($input['request_type'] ?? '')));
+    $clientName = trim((string) ($input['name'] ?? ''));
+    $clientEmail = strtolower(trim((string) ($input['email'] ?? '')));
+    $phone = bani_normalize_phone((string) ($input['phone'] ?? ''));
+
+    if (!in_array($requestType, ['shipping', 'sourcing'], true) || $clientName === '' || ($clientEmail === '' && $phone === '')) {
+        return ['success' => false, 'message' => 'Please provide the client name and either an email address or WhatsApp number.'];
+    }
+
+    if ($requestType === 'shipping') {
+        $origin = trim((string) ($input['origin'] ?? ''));
+        $destination = trim((string) ($input['destination'] ?? ''));
+        $mode = trim((string) ($input['mode'] ?? ''));
+
+        if ($origin === '' || $destination === '' || $mode === '') {
+            return ['success' => false, 'message' => 'Shipping quote requests need origin, destination, and freight mode.'];
+        }
+    } else {
+        $productCategory = trim((string) ($input['product_category'] ?? ''));
+        $quantity = trim((string) ($input['quantity'] ?? ''));
+        $productDetails = trim((string) ($input['product_details'] ?? ''));
+
+        if ($productCategory === '' || $quantity === '' || $productDetails === '') {
+            return ['success' => false, 'message' => 'Sourcing requests need product category, quantity, and product details.'];
+        }
+    }
+
+    $statement = $pdo->prepare(
+        'INSERT INTO portal_quote_requests
+         (request_type, client_email, client_name, phone, shipment_type, origin, destination, mode, weight, product_category, quantity, market, budget, product_details, notes, status, assigned_to, assigned_name, admin_notes, created_at, updated_at)
+         VALUES
+         (:request_type, :client_email, :client_name, :phone, :shipment_type, :origin, :destination, :mode, :weight, :product_category, :quantity, :market, :budget, :product_details, :notes, :status, :assigned_to, :assigned_name, :admin_notes, :created_at, :updated_at)'
+    );
+
+    $timestamp = gmdate('Y-m-d H:i:s');
+    $statement->execute([
+        ':request_type' => $requestType,
+        ':client_email' => $clientEmail !== '' ? $clientEmail : null,
+        ':client_name' => $clientName,
+        ':phone' => $phone !== '' ? $phone : null,
+        ':shipment_type' => trim((string) ($input['type'] ?? '')) !== '' ? trim((string) ($input['type'] ?? '')) : null,
+        ':origin' => trim((string) ($input['origin'] ?? '')) !== '' ? trim((string) ($input['origin'] ?? '')) : null,
+        ':destination' => trim((string) ($input['destination'] ?? '')) !== '' ? trim((string) ($input['destination'] ?? '')) : null,
+        ':mode' => trim((string) ($input['mode'] ?? '')) !== '' ? trim((string) ($input['mode'] ?? '')) : null,
+        ':weight' => trim((string) ($input['weight'] ?? '')) !== '' ? trim((string) ($input['weight'] ?? '')) : null,
+        ':product_category' => trim((string) ($input['product_category'] ?? '')) !== '' ? trim((string) ($input['product_category'] ?? '')) : null,
+        ':quantity' => trim((string) ($input['quantity'] ?? '')) !== '' ? trim((string) ($input['quantity'] ?? '')) : null,
+        ':market' => trim((string) ($input['market'] ?? '')) !== '' ? trim((string) ($input['market'] ?? '')) : null,
+        ':budget' => trim((string) ($input['budget'] ?? '')) !== '' ? trim((string) ($input['budget'] ?? '')) : null,
+        ':product_details' => trim((string) ($input['product_details'] ?? '')) !== '' ? trim((string) ($input['product_details'] ?? '')) : null,
+        ':notes' => trim((string) ($input['notes'] ?? '')) !== '' ? trim((string) ($input['notes'] ?? '')) : null,
+        ':status' => 'Submitted',
+        ':assigned_to' => null,
+        ':assigned_name' => null,
+        ':admin_notes' => null,
+        ':created_at' => $timestamp,
+        ':updated_at' => $timestamp,
+    ]);
+
+    return ['success' => true, 'message' => ucfirst($requestType) . ' quote request submitted successfully.'];
+}
+
+function bani_update_quote_request(int $requestId, array $input): array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_quote_requests')) {
+        return ['success' => false, 'message' => 'Quote request intake is not ready yet.'];
+    }
+
+    $status = trim((string) ($input['quote_status'] ?? $input['status'] ?? ''));
+    $assignedTo = strtolower(trim((string) ($input['assigned_to'] ?? '')));
+    $adminNotes = trim((string) ($input['admin_notes'] ?? ''));
+
+    if ($requestId <= 0 || $status === '') {
+        return ['success' => false, 'message' => 'A valid quote request and status are required.'];
+    }
+
+    $assignedName = null;
+    if ($assignedTo !== '') {
+        $staff = bani_find_user($assignedTo);
+        if ($staff === null || !in_array((string) ($staff['role'] ?? ''), ['staff', 'admin'], true)) {
+            return ['success' => false, 'message' => 'Select a valid staff or admin account for assignment.'];
+        }
+        $assignedName = (string) ($staff['name'] ?? $assignedTo);
+    }
+
+    $statement = $pdo->prepare(
+        'UPDATE portal_quote_requests
+         SET status = :status,
+             assigned_to = :assigned_to,
+             assigned_name = :assigned_name,
+             admin_notes = :admin_notes,
+             updated_at = :updated_at
+         WHERE id = :id'
+    );
+
+    $statement->execute([
+        ':status' => $status,
+        ':assigned_to' => $assignedTo !== '' ? $assignedTo : null,
+        ':assigned_name' => $assignedName,
+        ':admin_notes' => $adminNotes !== '' ? $adminNotes : null,
+        ':updated_at' => gmdate('Y-m-d H:i:s'),
+        ':id' => $requestId,
+    ]);
+
+    return ['success' => true, 'message' => 'Quote request updated successfully.'];
 }
 
 function bani_log_shipment_update(array $shipment, string $status, string $nextStep, ?string $notes = null): void
