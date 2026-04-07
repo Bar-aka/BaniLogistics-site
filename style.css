@@ -767,6 +767,45 @@ textarea {
   color: var(--muted);
 }
 
+.dashboard-intake-form {
+  margin-top: 8px;
+}
+
+.inline-actions {
+  display: inline-flex;
+  margin: 0;
+}
+
+.inline-actions button {
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  box-shadow: none;
+}
+
+.inline-form-stack {
+  display: grid;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.inline-form-stack input,
+.inline-form-stack select,
+.inline-form-stack textarea {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.inline-form-stack textarea {
+  min-height: 90px;
+}
+
+.inline-form-stack button {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  box-shadow: none;
+}
+
 .dashboard-page .site-nav a,
 .dashboard-page .button,
 .dashboard-page button,
@@ -820,6 +859,254 @@ textarea {
 
 .result-box.show {
   display: block;
+}
+
+.result-box.result-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #0f6c4f;
+  border-color: rgba(16, 185, 129, 0.22);
+}
+
+.result-box.result-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #a32929;
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+.bani-chatbot {
+  position: fixed;
+  right: 20px;
+  bottom: 90px;
+  z-index: 65;
+  width: min(360px, calc(100vw - 28px));
+  border-radius: 22px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  box-shadow: 0 24px 48px rgba(11, 17, 24, 0.18);
+  background: rgba(255, 255, 255, 0.98);
+  overflow: hidden;
+  transform: translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.22s ease;
+}
+
+.bani-chatbot.show {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bani-chatbot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #0d141c, #1b74e4);
+  color: #ffffff;
+}
+
+.bani-chatbot-header strong,
+.bani-chatbot-header span {
+  display: block;
+}
+
+.bani-chatbot-body {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.bani-chatbot-messages {
+  display: grid;
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.bani-chatbot-message {
+  padding: 12px 14px;
+  border-radius: 16px;
+  line-height: 1.55;
+  font-size: 0.94rem;
+}
+
+.bani-chatbot-message.bot {
+  background: #eef5ff;
+  color: #173252;
+}
+
+.bani-chatbot-message.user {
+  background: #0d141c;
+  color: #ffffff;
+  margin-left: 24px;
+}
+
+.bani-chatbot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bani-chatbot-chip {
+  border: 1px solid rgba(27, 116, 228, 0.18);
+  background: #f5f9ff;
+  color: #0f4f9d;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bani-chatbot-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.bani-chatbot-form input {
+  padding: 12px 14px;
+}
+
+.bani-chatbot-toggle {
+  position: fixed;
+  right: 20px;
+  bottom: 90px;
+  z-index: 64;
+  border-radius: 999px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #0d141c, #1b74e4);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 18px 34px rgba(11, 17, 24, 0.24);
+}
+
+.workspace-grid,
+.detail-layout,
+.summary-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.workspace-grid,
+.detail-layout {
+  grid-template-columns: 1.2fr 0.8fr;
+}
+
+.summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 22px 0;
+}
+
+.form-shell form {
+  margin-top: 18px;
+}
+
+.detail-card {
+  align-self: start;
+}
+
+.detail-panel {
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 18px;
+}
+
+.detail-panel h3,
+.invoice-document h2,
+.invoice-document h3 {
+  margin-top: 0;
+}
+
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.workflow-card {
+  display: grid;
+  gap: 14px;
+}
+
+.workflow-card .button {
+  text-align: center;
+}
+
+.invoice-document {
+  padding: 30px;
+  position: relative;
+  overflow: hidden;
+}
+
+.invoice-watermark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("/images/logo.png") center 42% / 320px auto no-repeat;
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+.invoice-document > * {
+  position: relative;
+  z-index: 1;
+}
+
+.invoice-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.invoice-meta {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  text-align: right;
+}
+
+.invoice-meta strong {
+  font-size: 1.2rem;
+}
+
+.invoice-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 18px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.invoice-line p {
+  margin-bottom: 0;
+}
+
+.invoice-amount {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--accent-deep);
+  white-space: nowrap;
+}
+
+.invoice-total {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.invoice-total strong {
+  font-size: 1.4rem;
+  color: var(--accent-deep);
 }
 
 .status-card h4 {
@@ -985,13 +1272,19 @@ textarea {
   .dashboard-mini-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .workflow-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1040px) {
   .hero,
   .hero-grid,
   .portal-grid,
-  .dashboard-grid {
+  .dashboard-grid,
+  .workspace-grid,
+  .detail-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1022,7 +1315,8 @@ textarea {
 
   .hero-stats,
   .hero-grid,
-  .form-grid {
+  .form-grid,
+  .summary-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1075,6 +1369,18 @@ textarea {
   .legal-card {
     padding: 20px;
     border-radius: 20px;
+  }
+
+  .invoice-topline,
+  .invoice-line,
+  .invoice-total {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .invoice-meta {
+    justify-items: start;
+    text-align: left;
   }
 
   .hero-copy h1,
