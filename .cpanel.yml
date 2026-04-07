@@ -18,11 +18,13 @@ deployment:
     - /bin/cp -R create-invoice.php $DEPLOYPATH
     - /bin/cp -R create-quote.php $DEPLOYPATH
     - /bin/cp -R create-shipment.php $DEPLOYPATH
+    - /bin/cp -R incoming-request-detail.php $DEPLOYPATH
     - /bin/cp -R invoice-view.php $DEPLOYPATH
     - /bin/cp -R login.html $DEPLOYPATH
     - /bin/cp -R login.php $DEPLOYPATH
     - /bin/cp -R logout.php $DEPLOYPATH
     - /bin/cp -R portal-data.php $DEPLOYPATH
+    - /bin/cp -R quote-request-detail.php $DEPLOYPATH
     - /bin/cp -R shipment-detail.php $DEPLOYPATH
     - /bin/cp -R client-dashboard.php $DEPLOYPATH
     - /bin/cp -R staff-dashboard.php $DEPLOYPATH

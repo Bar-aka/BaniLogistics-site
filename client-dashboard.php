@@ -18,6 +18,14 @@ $quotes = bani_fetch_quotes($clientEmail, 10);
 $invoices = bani_fetch_invoices($clientEmail, 10);
 $incomingRequests = bani_fetch_incoming_requests($clientEmail, 10);
 $summary = bani_client_summary($clientEmail);
+$openIncomingRequests = array_values(array_filter(
+    $incomingRequests,
+    static fn(array $incoming): bool => (int) ($incoming['linked_shipment_id'] ?? 0) <= 0
+));
+$convertedIncomingRequests = array_values(array_filter(
+    $incomingRequests,
+    static fn(array $incoming): bool => (int) ($incoming['linked_shipment_id'] ?? 0) > 0
+));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -67,7 +75,7 @@ $summary = bani_client_summary($clientEmail);
         <article class="dashboard-stat"><strong><?= (int) $summary['shipments'] ?></strong><span>Active shipments</span></article>
         <article class="dashboard-stat"><strong><?= (int) $summary['quotes'] ?></strong><span>Open quotes</span></article>
         <article class="dashboard-stat"><strong>KES <?= number_format((float) $summary['outstanding'], 2) ?></strong><span>Outstanding invoices</span></article>
-        <article class="dashboard-stat"><strong><?= count($incomingRequests) ?></strong><span>Incoming supplier alerts</span></article>
+        <article class="dashboard-stat"><strong><?= count($openIncomingRequests) ?></strong><span>Incoming supplier alerts</span></article>
       </section>
 
       <section class="dashboard-grid">
@@ -116,7 +124,7 @@ $summary = bani_client_summary($clientEmail);
         <article class="dashboard-card">
           <h3>Submitted Incoming Details</h3>
           <ul class="dashboard-list">
-            <?php foreach (array_slice($incomingRequests, 0, 6) as $incoming): ?>
+            <?php foreach (array_slice($openIncomingRequests, 0, 6) as $incoming): ?>
               <li>
                 <span>
                   <?= htmlspecialchars((string) ($incoming['supplier_tracking_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
@@ -127,14 +135,22 @@ $summary = bani_client_summary($clientEmail);
                       | ETA <?= htmlspecialchars((string) $incoming['expected_arrival'], ENT_QUOTES, 'UTF-8') ?>
                     <?php endif; ?>
                   </small>
+                  <?php if (!empty($incoming['linked_shipment_id']) && !empty($incoming['linked_shipment_reference'])): ?>
+                    <br><small>Converted to shipment <a href="shipment-detail.php?id=<?= (int) $incoming['linked_shipment_id'] ?>"><?= htmlspecialchars((string) $incoming['linked_shipment_reference'], ENT_QUOTES, 'UTF-8') ?></a></small>
+                  <?php elseif (!empty($incoming['admin_notes'])): ?>
+                    <br><small><?= htmlspecialchars((string) $incoming['admin_notes'], ENT_QUOTES, 'UTF-8') ?></small>
+                  <?php endif; ?>
                 </span>
-                <span class="badge badge-blue"><?= htmlspecialchars((string) ($incoming['status'] ?? 'Submitted'), ENT_QUOTES, 'UTF-8') ?></span>
+                <span>
+                  <span class="badge <?= !empty($incoming['linked_shipment_id']) ? 'badge-green' : 'badge-blue' ?>"><?= htmlspecialchars((string) ($incoming['status'] ?? 'Submitted'), ENT_QUOTES, 'UTF-8') ?></span><br>
+                  <a href="<?= htmlspecialchars(bani_whatsapp_link('Hello Bani, I am following up on supplier tracking ' . (string) ($incoming['supplier_tracking_number'] ?? '') . ' for my client portal account.'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">WhatsApp Follow-Up</a>
+                </span>
               </li>
             <?php endforeach; ?>
-            <?php if ($incomingRequests === []): ?>
+            <?php if ($openIncomingRequests === []): ?>
               <li>
-                <span>No incoming supplier details submitted yet<br><small>Add supplier tracking numbers here so the operations team can monitor what is on the way.</small></span>
-                <span class="badge badge-blue">Awaiting</span>
+                <span>No active incoming package notifications right now<br><small>Once you log a supplier tracking number, it will stay here until operations converts it into a shipment.</small></span>
+                <span class="badge badge-green">Clear</span>
               </li>
             <?php endif; ?>
           </ul>
@@ -166,6 +182,26 @@ $summary = bani_client_summary($clientEmail);
           </table>
         </article>
 
+        <article class="dashboard-card">
+          <h3>Converted Incoming Requests</h3>
+          <ul class="dashboard-list">
+            <?php foreach (array_slice($convertedIncomingRequests, 0, 5) as $incoming): ?>
+              <li>
+                <span>
+                  <?= htmlspecialchars((string) ($incoming['supplier_tracking_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
+                  <small>Now active as <a href="shipment-detail.php?id=<?= (int) ($incoming['linked_shipment_id'] ?? 0) ?>"><?= htmlspecialchars((string) ($incoming['linked_shipment_reference'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a></small>
+                </span>
+                <span class="badge badge-green">Shipment Opened</span>
+              </li>
+            <?php endforeach; ?>
+            <?php if ($convertedIncomingRequests === []): ?>
+              <li><span>No incoming requests have been converted into shipments yet.<br><small>Once operations opens the shipment, the link will appear here automatically.</small></span><span class="badge badge-blue">Awaiting</span></li>
+            <?php endif; ?>
+          </ul>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
         <article class="dashboard-card">
           <h3>Latest Account Activity</h3>
           <div class="timeline">

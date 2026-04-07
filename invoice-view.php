@@ -165,8 +165,14 @@ $trackingReference = (string) ($invoice['tracking_reference'] ?? '');
               <?php if (!empty($invoice['mpesa_details'])): ?>
                 <li><span>M-Pesa<br><small>Mobile money settlement</small></span><span><?= nl2br(htmlspecialchars((string) $invoice['mpesa_details'], ENT_QUOTES, 'UTF-8')) ?></span></li>
               <?php endif; ?>
+              <?php if (!empty($invoice['mpesa_pay_link'])): ?>
+                <li><span>M-Pesa Checkout<br><small>Direct payment link</small></span><span><a href="<?= htmlspecialchars((string) $invoice['mpesa_pay_link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Open M-Pesa Payment</a></span></li>
+              <?php endif; ?>
               <?php if (!empty($invoice['paypal_details'])): ?>
                 <li><span>PayPal<br><small>Online payment route</small></span><span><?= nl2br(htmlspecialchars((string) $invoice['paypal_details'], ENT_QUOTES, 'UTF-8')) ?></span></li>
+              <?php endif; ?>
+              <?php if (!empty($invoice['paypal_pay_link'])): ?>
+                <li><span>PayPal Checkout<br><small>Direct payment link</small></span><span><a href="<?= htmlspecialchars((string) $invoice['paypal_pay_link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Pay With PayPal</a></span></li>
               <?php endif; ?>
               <?php if (!empty($invoice['payment_instructions'])): ?>
                 <li><span>Instructions<br><small>Reference and proof guidance</small></span><span><?= nl2br(htmlspecialchars((string) $invoice['payment_instructions'], ENT_QUOTES, 'UTF-8')) ?></span></li>
@@ -181,6 +187,16 @@ $trackingReference = (string) ($invoice['tracking_reference'] ?? '');
             <div class="detail-panel">
               <h3>Submit Payment Reference</h3>
               <p class="muted">If you settle this invoice outside the platform, paste the payment reference here so our accounts team can verify it.</p>
+              <?php if (!empty($invoice['mpesa_pay_link']) || !empty($invoice['paypal_pay_link'])): ?>
+                <div class="dashboard-actions" style="margin-bottom: 14px;">
+                  <?php if (!empty($invoice['mpesa_pay_link'])): ?>
+                    <a class="button primary" href="<?= htmlspecialchars((string) $invoice['mpesa_pay_link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Pay With M-Pesa</a>
+                  <?php endif; ?>
+                  <?php if (!empty($invoice['paypal_pay_link'])): ?>
+                    <a class="button secondary" href="<?= htmlspecialchars((string) $invoice['paypal_pay_link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Pay With PayPal</a>
+                  <?php endif; ?>
+                </div>
+              <?php endif; ?>
               <form method="post">
                 <input type="hidden" name="action" value="submit-payment-reference">
                 <input type="hidden" name="invoice_id" value="<?= (int) $invoiceId ?>">

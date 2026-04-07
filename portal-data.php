@@ -153,7 +153,7 @@ function bani_fetch_invoices(?string $clientEmail = null, int $limit = 20): arra
 
     if ($clientEmail !== null) {
         $statement = $pdo->prepare(
-            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
+            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, mpesa_pay_link, paypal_details, paypal_pay_link, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
              FROM portal_invoices
              WHERE client_email = :client_email
              ORDER BY created_at DESC
@@ -162,7 +162,7 @@ function bani_fetch_invoices(?string $clientEmail = null, int $limit = 20): arra
         $statement->execute([':client_email' => strtolower(trim($clientEmail))]);
     } else {
         $statement = $pdo->query(
-            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
+            "SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, mpesa_pay_link, paypal_details, paypal_pay_link, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
              FROM portal_invoices
              ORDER BY created_at DESC
              LIMIT {$limit}"
@@ -183,7 +183,7 @@ function bani_fetch_invoice_by_id(int $invoiceId): ?array
     }
 
     $statement = $pdo->prepare(
-        'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
+        'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, mpesa_pay_link, paypal_details, paypal_pay_link, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
          FROM portal_invoices
          WHERE id = :id
          LIMIT 1'
@@ -209,7 +209,7 @@ function bani_fetch_invoices_by_tracking_reference(string $trackingReference, ?s
 
     if ($clientEmail !== null) {
         $statement = $pdo->prepare(
-            'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
+            'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, mpesa_pay_link, paypal_details, paypal_pay_link, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
              FROM portal_invoices
              WHERE tracking_reference = :tracking_reference AND client_email = :client_email
              ORDER BY created_at DESC'
@@ -220,7 +220,7 @@ function bani_fetch_invoices_by_tracking_reference(string $trackingReference, ?s
         ]);
     } else {
         $statement = $pdo->prepare(
-            'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
+            'SELECT id, client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, mpesa_pay_link, paypal_details, paypal_pay_link, payment_instructions, payment_reference, payment_notes, payment_submitted_at, created_at, updated_at
              FROM portal_invoices
              WHERE tracking_reference = :tracking_reference
              ORDER BY created_at DESC'
@@ -245,7 +245,7 @@ function bani_fetch_incoming_requests(?string $clientEmail = null, int $limit = 
 
     if ($clientEmail !== null) {
         $statement = $pdo->prepare(
-            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, admin_notes, notes, created_at, updated_at
+            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, linked_shipment_id, linked_shipment_reference, converted_at, admin_notes, notes, created_at, updated_at
              FROM portal_incoming_requests
              WHERE client_email = :client_email
              ORDER BY created_at DESC
@@ -254,7 +254,7 @@ function bani_fetch_incoming_requests(?string $clientEmail = null, int $limit = 
         $statement->execute([':client_email' => strtolower(trim($clientEmail))]);
     } else {
         $statement = $pdo->query(
-            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, admin_notes, notes, created_at, updated_at
+            "SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, linked_shipment_id, linked_shipment_reference, converted_at, admin_notes, notes, created_at, updated_at
              FROM portal_incoming_requests
              ORDER BY created_at DESC
              LIMIT {$limit}"
@@ -275,7 +275,7 @@ function bani_fetch_incoming_request_by_id(int $requestId): ?array
     }
 
     $statement = $pdo->prepare(
-        'SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, admin_notes, notes, created_at, updated_at
+        'SELECT id, client_email, client_name, supplier_name, supplier_tracking_number, item_description, origin, expected_arrival, status, assigned_to, assigned_name, linked_shipment_id, linked_shipment_reference, converted_at, admin_notes, notes, created_at, updated_at
          FROM portal_incoming_requests
          WHERE id = :id
          LIMIT 1'
@@ -304,6 +304,26 @@ function bani_fetch_quote_requests(int $limit = 20): array
     $rows = $statement->fetchAll();
 
     return is_array($rows) ? $rows : [];
+}
+
+function bani_fetch_quote_request_by_id(int $requestId): ?array
+{
+    $pdo = bani_db();
+
+    if (!$pdo instanceof PDO || !bani_records_table_available('portal_quote_requests') || $requestId <= 0) {
+        return null;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT id, request_type, client_email, client_name, phone, shipment_type, origin, destination, mode, weight, product_category, quantity, market, budget, product_details, notes, status, assigned_to, assigned_name, admin_notes, created_at, updated_at
+         FROM portal_quote_requests
+         WHERE id = :id
+         LIMIT 1'
+    );
+    $statement->execute([':id' => $requestId]);
+    $row = $statement->fetch();
+
+    return is_array($row) ? $row : null;
 }
 
 function bani_fetch_shipment_updates(int $shipmentId): array
@@ -350,6 +370,32 @@ function bani_client_summary(string $clientEmail): array
 function bani_accounts_email(): string
 {
     return 'accounts@banilogistics.co.ke';
+}
+
+function bani_whatsapp_link(string $message, string $phone = '254782013236'): string
+{
+    $phone = preg_replace('/[^0-9]/', '', $phone) ?? '254782013236';
+
+    return 'https://wa.me/' . $phone . '?text=' . rawurlencode(trim($message));
+}
+
+function bani_normalize_payment_link(?string $url): ?string
+{
+    $url = trim((string) $url);
+
+    if ($url === '') {
+        return null;
+    }
+
+    if (preg_match('#^https?://#i', $url) === 1) {
+        return $url;
+    }
+
+    if (str_starts_with($url, 'www.')) {
+        return 'https://' . $url;
+    }
+
+    return $url;
 }
 
 function bani_create_incoming_request(string $clientEmail, array $input): array
@@ -421,10 +467,14 @@ function bani_update_incoming_request_status(int $requestId, array|string $input
         $status = trim((string) ($input['incoming_status'] ?? $input['status'] ?? ''));
         $assignedTo = strtolower(trim((string) ($input['assigned_to'] ?? '')));
         $adminNotes = trim((string) ($input['admin_notes'] ?? ''));
+        $linkedShipmentId = (int) ($input['linked_shipment_id'] ?? 0);
+        $linkedShipmentReference = strtoupper(trim((string) ($input['linked_shipment_reference'] ?? '')));
     } else {
         $status = trim($input);
         $assignedTo = '';
         $adminNotes = '';
+        $linkedShipmentId = 0;
+        $linkedShipmentReference = '';
     }
 
     if ($requestId <= 0 || $status === '') {
@@ -445,6 +495,9 @@ function bani_update_incoming_request_status(int $requestId, array|string $input
          SET status = :status,
              assigned_to = :assigned_to,
              assigned_name = :assigned_name,
+             linked_shipment_id = :linked_shipment_id,
+             linked_shipment_reference = :linked_shipment_reference,
+             converted_at = :converted_at,
              admin_notes = :admin_notes,
              updated_at = :updated_at
          WHERE id = :id'
@@ -454,6 +507,9 @@ function bani_update_incoming_request_status(int $requestId, array|string $input
         ':status' => $status,
         ':assigned_to' => $assignedTo !== '' ? $assignedTo : null,
         ':assigned_name' => $assignedName,
+        ':linked_shipment_id' => $linkedShipmentId > 0 ? $linkedShipmentId : null,
+        ':linked_shipment_reference' => $linkedShipmentReference !== '' ? $linkedShipmentReference : null,
+        ':converted_at' => $linkedShipmentId > 0 ? gmdate('Y-m-d H:i:s') : null,
         ':admin_notes' => $adminNotes !== '' ? $adminNotes : null,
         ':updated_at' => gmdate('Y-m-d H:i:s'),
         ':id' => $requestId,
@@ -943,7 +999,13 @@ function bani_convert_incoming_request_to_shipment(int $requestId, array $input)
         return $shipmentResult;
     }
 
-    bani_update_incoming_request_status($requestId, 'Shipment Opened');
+    bani_update_incoming_request_status($requestId, [
+        'incoming_status' => 'Shipment Opened',
+        'assigned_to' => $assignedTo,
+        'admin_notes' => 'Converted into active shipment ' . (string) ($shipmentResult['reference'] ?? '') . '.',
+        'linked_shipment_id' => (int) ($shipmentResult['id'] ?? 0),
+        'linked_shipment_reference' => (string) ($shipmentResult['reference'] ?? ''),
+    ]);
 
     return [
         'success' => true,
@@ -1105,7 +1167,9 @@ function bani_create_invoice(array $input): array
     $bankBranch = trim((string) ($input['bank_branch'] ?? ''));
     $swiftCode = trim((string) ($input['swift_code'] ?? ''));
     $mpesaDetails = trim((string) ($input['mpesa_details'] ?? ''));
+    $mpesaPayLink = bani_normalize_payment_link((string) ($input['mpesa_pay_link'] ?? ''));
     $paypalDetails = trim((string) ($input['paypal_details'] ?? ''));
+    $paypalPayLink = bani_normalize_payment_link((string) ($input['paypal_pay_link'] ?? ''));
     $paymentInstructions = trim((string) ($input['payment_instructions'] ?? ''));
 
     if ($clientEmail === '' || $description === '' || $amount <= 0 || $currency === '' || $status === '' || $dueDate === '') {
@@ -1121,8 +1185,8 @@ function bani_create_invoice(array $input): array
     $timestamp = gmdate('Y-m-d H:i:s');
 
     $statement = $pdo->prepare(
-        'INSERT INTO portal_invoices (client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, paypal_details, payment_instructions, created_at, updated_at)
-         VALUES (:client_email, :invoice_number, :client_name, :tracking_reference, :description, :amount, :currency, :status, :due_date, :bank_name, :account_name, :account_number, :bank_branch, :swift_code, :mpesa_details, :paypal_details, :payment_instructions, :created_at, :updated_at)'
+        'INSERT INTO portal_invoices (client_email, invoice_number, client_name, tracking_reference, description, amount, currency, status, due_date, bank_name, account_name, account_number, bank_branch, swift_code, mpesa_details, mpesa_pay_link, paypal_details, paypal_pay_link, payment_instructions, created_at, updated_at)
+         VALUES (:client_email, :invoice_number, :client_name, :tracking_reference, :description, :amount, :currency, :status, :due_date, :bank_name, :account_name, :account_number, :bank_branch, :swift_code, :mpesa_details, :mpesa_pay_link, :paypal_details, :paypal_pay_link, :payment_instructions, :created_at, :updated_at)'
     );
 
     $statement->execute([
@@ -1141,7 +1205,9 @@ function bani_create_invoice(array $input): array
         ':bank_branch' => $bankBranch !== '' ? $bankBranch : null,
         ':swift_code' => $swiftCode !== '' ? $swiftCode : null,
         ':mpesa_details' => $mpesaDetails !== '' ? $mpesaDetails : null,
+        ':mpesa_pay_link' => $mpesaPayLink,
         ':paypal_details' => $paypalDetails !== '' ? $paypalDetails : null,
+        ':paypal_pay_link' => $paypalPayLink,
         ':payment_instructions' => $paymentInstructions !== '' ? $paymentInstructions : null,
         ':created_at' => $timestamp,
         ':updated_at' => $timestamp,

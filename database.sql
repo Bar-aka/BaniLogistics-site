@@ -84,7 +84,9 @@ CREATE TABLE IF NOT EXISTS portal_invoices (
   bank_branch VARCHAR(190) NULL,
   swift_code VARCHAR(80) NULL,
   mpesa_details TEXT NULL,
+  mpesa_pay_link VARCHAR(255) NULL,
   paypal_details TEXT NULL,
+  paypal_pay_link VARCHAR(255) NULL,
   payment_instructions TEXT NULL,
   payment_reference VARCHAR(190) NULL,
   payment_notes TEXT NULL,
@@ -107,6 +109,9 @@ CREATE TABLE IF NOT EXISTS portal_incoming_requests (
   status VARCHAR(80) NOT NULL DEFAULT 'Submitted',
   assigned_to VARCHAR(190) NULL,
   assigned_name VARCHAR(190) NULL,
+  linked_shipment_id INT UNSIGNED NULL,
+  linked_shipment_reference VARCHAR(40) NULL,
+  converted_at DATETIME NULL,
   admin_notes TEXT NULL,
   notes TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -151,7 +156,10 @@ ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT NULL A
 ALTER TABLE portal_shipments ADD COLUMN IF NOT EXISTS incoming_request_id INT UNSIGNED NULL AFTER client_name;
 ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(190) NULL AFTER status;
 ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190) NULL AFTER assigned_to;
-ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS admin_notes TEXT NULL AFTER assigned_name;
+ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS linked_shipment_id INT UNSIGNED NULL AFTER assigned_name;
+ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS linked_shipment_reference VARCHAR(40) NULL AFTER linked_shipment_id;
+ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS converted_at DATETIME NULL AFTER linked_shipment_reference;
+ALTER TABLE portal_incoming_requests ADD COLUMN IF NOT EXISTS admin_notes TEXT NULL AFTER converted_at;
 ALTER TABLE portal_quote_requests ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(190) NULL AFTER status;
 ALTER TABLE portal_quote_requests ADD COLUMN IF NOT EXISTS assigned_name VARCHAR(190) NULL AFTER assigned_to;
 ALTER TABLE portal_quote_requests ADD COLUMN IF NOT EXISTS admin_notes TEXT NULL AFTER assigned_name;
@@ -162,8 +170,10 @@ ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS account_number VARCHAR(120)
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS bank_branch VARCHAR(190) NULL AFTER account_number;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS swift_code VARCHAR(80) NULL AFTER bank_branch;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS mpesa_details TEXT NULL AFTER swift_code;
-ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS paypal_details TEXT NULL AFTER mpesa_details;
-ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_instructions TEXT NULL AFTER paypal_details;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS mpesa_pay_link VARCHAR(255) NULL AFTER mpesa_details;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS paypal_details TEXT NULL AFTER mpesa_pay_link;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS paypal_pay_link VARCHAR(255) NULL AFTER paypal_details;
+ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_instructions TEXT NULL AFTER paypal_pay_link;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(190) NULL AFTER payment_instructions;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_notes TEXT NULL AFTER payment_reference;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_submitted_at DATETIME NULL AFTER payment_notes;

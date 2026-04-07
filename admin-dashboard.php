@@ -206,6 +206,7 @@ $assignedIncomingRequests = count(array_filter($incomingRequests, static fn(arra
                       <small><?= htmlspecialchars((string) ($request['status'] ?? 'Submitted'), ENT_QUOTES, 'UTF-8') ?></small>
                     </td>
                     <td>
+                      <a class="button secondary" href="quote-request-detail.php?id=<?= (int) ($request['id'] ?? 0) ?>">Open</a>
                       <form method="post" action="admin-dashboard.php" class="inline-form-stack">
                         <input type="hidden" name="action" value="update-quote-request">
                         <input type="hidden" name="request_id" value="<?= (int) ($request['id'] ?? 0) ?>">
@@ -225,6 +226,7 @@ $assignedIncomingRequests = count(array_filter($incomingRequests, static fn(arra
                         <textarea name="admin_notes" placeholder="Internal follow-up note"><?= htmlspecialchars((string) ($request['admin_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
                         <button type="submit">Save</button>
                       </form>
+                      <a href="<?= htmlspecialchars(bani_whatsapp_link('Hello ' . (string) ($request['client_name'] ?? 'Client') . ', this is Bani Global Logistics following up on your ' . (string) ($request['request_type'] ?? 'quote') . ' request.'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">WhatsApp Client</a>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -263,6 +265,7 @@ $assignedIncomingRequests = count(array_filter($incomingRequests, static fn(arra
                     <td><?= htmlspecialchars((string) ($incoming['item_description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                     <td><span class="badge badge-blue"><?= htmlspecialchars((string) ($incoming['status'] ?? 'Submitted'), ENT_QUOTES, 'UTF-8') ?></span></td>
                     <td>
+                      <a class="button secondary" href="incoming-request-detail.php?id=<?= (int) ($incoming['id'] ?? 0) ?>">Open</a>
                       <form method="post" action="admin-dashboard.php" class="inline-form-stack">
                         <input type="hidden" name="action" value="convert-incoming">
                         <input type="hidden" name="request_id" value="<?= (int) ($incoming['id'] ?? 0) ?>">
@@ -319,6 +322,7 @@ $assignedIncomingRequests = count(array_filter($incomingRequests, static fn(arra
                   <textarea name="admin_notes" placeholder="Internal intake note"><?= htmlspecialchars((string) ($incoming['admin_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
                   <button type="submit">Save</button>
                 </form>
+                <a href="<?= htmlspecialchars(bani_whatsapp_link('Hello ' . (string) ($incoming['client_name'] ?? 'Client') . ', we are following up on your incoming package notification for supplier tracking ' . (string) ($incoming['supplier_tracking_number'] ?? '') . '.'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">WhatsApp Client</a>
               </li>
             <?php endforeach; ?>
             <?php if ($incomingRequests === []): ?>

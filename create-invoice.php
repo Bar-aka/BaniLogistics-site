@@ -155,8 +155,18 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin' ? 'admin-dashboard.php' : 'sta
             </label>
 
             <label>
+              M-Pesa Payment Link
+              <input type="url" name="mpesa_pay_link" placeholder="Optional payment link if you use an external M-Pesa checkout">
+            </label>
+
+            <label>
               PayPal Details
               <textarea name="paypal_details" placeholder="PayPal email or payment link"></textarea>
+            </label>
+
+            <label>
+              PayPal Payment Link
+              <input type="url" name="paypal_pay_link" placeholder="Optional direct PayPal checkout link">
             </label>
 
             <label>

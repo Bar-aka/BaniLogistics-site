@@ -78,6 +78,7 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin'
         <div class="dashboard-actions">
           <a class="button secondary" href="<?= htmlspecialchars($dashboardUrl, ENT_QUOTES, 'UTF-8') ?>">Back to Dashboard</a>
           <a class="button primary" href="track.html">Open Tracking Page</a>
+          <a class="button secondary" href="<?= htmlspecialchars(bani_whatsapp_link('Hello Bani, I am following up on shipment ' . (string) ($shipment['reference'] ?? '') . '.'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">WhatsApp Support</a>
         </div>
       </section>
 
