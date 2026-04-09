@@ -151,5 +151,6 @@ $whatsAppMessage = 'Hello ' . (string) ($request['client_name'] ?? 'Client') . '
         </article>
       </section>
     </main>
+    <script src="/js/script.js"></script>
   </body>
 </html>

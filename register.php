@@ -126,5 +126,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </main>
 
     <a class="whatsapp-float" href="https://wa.me/254782013236" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+    <script src="/js/script.js"></script>
   </body>
 </html>

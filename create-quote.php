@@ -150,5 +150,6 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin' ? 'admin-dashboard.php' : 'sta
         </aside>
       </section>
     </main>
+    <script src="/js/script.js"></script>
   </body>
 </html>
