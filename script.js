@@ -384,3 +384,36 @@ if (trackingInput) {
     }
   });
 }
+
+
+// Accessible collapsible navigation for smaller screens.
+document.querySelectorAll(".nav-toggle").forEach(function (button) {
+  const navId = button.getAttribute("aria-controls");
+  const nav = navId ? document.getElementById(navId) : null;
+
+  if (!nav) {
+    return;
+  }
+
+  function setExpanded(expanded) {
+    button.setAttribute("aria-expanded", String(expanded));
+    nav.classList.toggle("is-open", expanded);
+  }
+
+  button.addEventListener("click", function () {
+    setExpanded(button.getAttribute("aria-expanded") !== "true");
+  });
+
+  nav.querySelectorAll("a").forEach(function (link) {
+    link.addEventListener("click", function () {
+      setExpanded(false);
+    });
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && button.getAttribute("aria-expanded") === "true") {
+      setExpanded(false);
+      button.focus();
+    }
+  });
+});
