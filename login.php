@@ -50,9 +50,10 @@ if ($currentUser) {
     <header class="site-header">
       <div class="nav-wrap">
         <a class="brand" href="index.html" aria-label="Bani Global Logistics Limited home">
-          <img src="/images/logo.png" alt="Bani Global Logistics Limited Logo">
+          <img src="/logo.png" alt="Bani Global Logistics Limited Logo">
         </a>
-        <nav class="site-nav" aria-label="Main navigation">
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">Menu</button>
+        <nav id="site-navigation" class="site-nav" aria-label="Main navigation">
           <a href="index.html">Home</a>
           <a href="about.html">About</a>
           <a href="quote.html">Request Quote</a>
@@ -188,6 +189,6 @@ if ($currentUser) {
         syncDestination();
       }());
     </script>
-    <script src="/js/script.js"></script>
+    <script src="/script.js"></script>
   </body>
 </html>
