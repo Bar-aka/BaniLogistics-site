@@ -1,7 +1,7 @@
 const contactForm = document.getElementById("contactForm");
 const contactResult = document.getElementById("contactResult");
 
-function bindQuoteForm(formId, resultId, messageBuilder) {
+async function submitQuoteRequest(formId, resultId) {
   const form = document.getElementById(formId);
   const result = document.getElementById(resultId);
 
@@ -9,42 +9,50 @@ function bindQuoteForm(formId, resultId, messageBuilder) {
     return;
   }
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
 
-    const formData = new FormData(form);
-    result.classList.add("show");
-    result.innerHTML = messageBuilder(formData);
-    form.reset();
+    const button = form.querySelector('button[type="submit"]');
+    const originalLabel = button ? button.textContent : "";
+    result.className = "result-box show";
+    result.textContent = "Sending your request…";
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Sending…";
+    }
+
+    try {
+      const response = await fetch(form.action || "quote-request.php", {
+        method: "POST",
+        body: new FormData(form),
+        headers: { Accept: "application/json" }
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || "We couldn’t submit your request. Please try again.");
+      }
+
+      result.className = "result-box show result-success";
+      result.textContent = payload.message || "Your quote request has been received.";
+      form.reset();
+      result.focus();
+    } catch (error) {
+      result.className = "result-box show result-error";
+      result.textContent = error.message || "We couldn’t send your request. Please try again or contact our team directly.";
+      result.focus();
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    }
   });
 }
 
-bindQuoteForm("shippingQuoteForm", "shippingQuoteResult", function (formData) {
-  const name = (formData.get("name") || "Client").toString();
-  const origin = (formData.get("origin") || "Origin").toString();
-  const destination = (formData.get("destination") || "Destination").toString();
-  const mode = (formData.get("mode") || "Freight").toString();
-
-  return (
-    "<strong>Shipping quote request received.</strong>" +
-    "<p>Thank you, " + name + ". Your " + mode + " request from " + origin +
-    " to " + destination + " has been recorded. Our team will review the route, handling scope, and delivery timeline before sharing the estimate.</p>"
-  );
-});
-
-bindQuoteForm("sourcingQuoteForm", "sourcingQuoteResult", function (formData) {
-  const name = (formData.get("name") || "Client").toString();
-  const category = (formData.get("product_category") || "the requested items").toString();
-  const quantity = (formData.get("quantity") || "your requested quantity").toString();
-  const market = (formData.get("market") || "").toString().trim();
-
-  return (
-    "<strong>Sourcing request received.</strong>" +
-    "<p>Thank you, " + name + ". We have logged your request for " + quantity +
-    " of " + category + (market ? " from " + market : "") +
-    ". Our team will review the specifications and confirm any extra sourcing details needed to proceed.</p>"
-  );
-});
+submitQuoteRequest("shippingQuoteForm", "shippingQuoteResult");
+submitQuoteRequest("sourcingQuoteForm", "sourcingQuoteResult");
 
 function baniChatbotReply(message) {
   const text = (message || "").toLowerCase();
@@ -175,21 +183,6 @@ if (document.readyState === "loading") {
   initializeBaniChatbot();
 }
 
-if (contactForm && contactResult) {
-  contactForm.addEventListener("submit", function (event) {
-    event.preventDefault();
-
-    const formData = new FormData(contactForm);
-    const name = formData.get("name") || "Client";
-
-    contactResult.classList.add("show");
-    contactResult.innerHTML =
-      "<strong>Message received.</strong>" +
-      "<p>Thank you, " + name + ". Your message has been captured for follow-up.</p>";
-
-    contactForm.reset();
-  });
-}
 
 
 const trackingInput = document.getElementById("trackingInput");
@@ -260,7 +253,7 @@ function fallbackTrackingResult(key) {
       badge: "Not Found",
       title: "Tracking number not found.",
       text: "Please confirm the reference and try again. Available references: BG000001, BG000014, BG000027.",
-      source: "Tracking source: local fallback",
+      source: "Demo data — not a live shipment status",
       details: ["Use one of the listed shipment references above."]
     };
   }
@@ -269,7 +262,7 @@ function fallbackTrackingResult(key) {
     badge: entry.badge,
     title: entry.title,
     text: entry.text,
-    source: "Tracking source: local fallback",
+    source: "Demo data — not a live shipment status",
     details: entry.details
   };
 }
