@@ -31,9 +31,9 @@
     <main>
       <section class="page-hero">
         <div class="eyebrow">Quote request</div>
-        <h1>Choose the type of quote you need.</h1>
+        <h1>Tell us what you need to move or source.</h1>
         <p>
-          Use the shipping quote when you already know what is moving, and use the sourcing quote when you need help identifying, buying, or consolidating goods before shipment.
+          Choose Shipping if you already have cargo details. Choose Sourcing if you need help finding or purchasing goods.
         </p>
       </section>
 
@@ -44,7 +44,7 @@
             <p>
               Share your cargo, route, and preferred mode so we can prepare a transport, customs, and handling estimate.
             </p>
-            <form id="shippingQuoteForm">
+            <form id="shippingQuoteForm" method="post" action="quote-request.php">
               <input type="hidden" name="request_type" value="shipping">
               <div class="form-grid">
                 <label>
@@ -106,7 +106,7 @@
               <button type="submit">Submit Shipping Quote</button>
             </form>
 
-            <div class="result-box" id="shippingQuoteResult"></div>
+            <div class="result-box" id="shippingQuoteResult" role="status" aria-live="polite" tabindex="-1"></div>
           </article>
 
           <article class="quote-card">
@@ -114,7 +114,7 @@
             <p>
               Use this when you want us to help source the goods before shipping. Share what you need and we will advise on the key specifications required to proceed.
             </p>
-            <form id="sourcingQuoteForm">
+            <form id="sourcingQuoteForm" method="post" action="quote-request.php">
               <input type="hidden" name="request_type" value="sourcing">
               <div class="form-grid">
                 <label>
@@ -168,7 +168,7 @@
               <button type="submit">Submit Sourcing Request</button>
             </form>
 
-            <div class="result-box" id="sourcingQuoteResult"></div>
+            <div class="result-box" id="sourcingQuoteResult" role="status" aria-live="polite" tabindex="-1"></div>
           </article>
         </div>
       </section>
