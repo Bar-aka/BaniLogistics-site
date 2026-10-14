@@ -219,7 +219,7 @@ $myQuoteRequests = array_values(array_filter(
                         <input type="hidden" name="shipment_id" value="<?= (int) ($shipment['id'] ?? 0) ?>">
                         <input type="hidden" name="assigned_to" value="<?= htmlspecialchars((string) ($shipment['assigned_to'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                         <select name="status">
-                          <?php foreach (['In Transit', 'Customs Clearance', 'Released from Customs', 'Out for Delivery', 'Delivered'] as $statusOption): ?>
+                          <?php foreach (['At Port', 'In Transit', 'Customs Clearance', 'Released from Customs', 'Out for Delivery', 'Delivered'] as $statusOption): ?>
                             <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"<?= (($shipment['status'] ?? '') === $statusOption) ? ' selected' : '' ?>><?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?></option>
                           <?php endforeach; ?>
                         </select>
