@@ -12,6 +12,10 @@ if (!is_array($request)) {
     http_response_code(404);
     exit('Quote request not found.');
 }
+if (($user['role'] ?? '') === 'staff' && strtolower((string) ($request['assigned_to'] ?? '')) !== strtolower((string) ($user['email'] ?? ''))) {
+    http_response_code(403);
+    exit('You can view only quote requests assigned to you.');
+}
 
 $recordMessage = '';
 $recordError = '';
@@ -131,6 +135,7 @@ $whatsAppMessage = 'Hello ' . (string) ($request['client_name'] ?? 'Client') . '
                   <?php endforeach; ?>
                 </select>
               </label>
+              <?php if (($user['role'] ?? '') === 'admin'): ?>
               <label>
                 Assign To
                 <select name="assigned_to">
@@ -142,6 +147,7 @@ $whatsAppMessage = 'Hello ' . (string) ($request['client_name'] ?? 'Client') . '
                   <?php endforeach; ?>
                 </select>
               </label>
+              <?php endif; ?>
             </div>
             <label>
               Internal Notes
