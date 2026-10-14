@@ -37,6 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array((string) ($user['role'] ??
 
 $updates = bani_fetch_shipment_updates($shipmentId);
 $incomingRequest = !empty($shipment['incoming_request_id']) ? bani_fetch_incoming_request_by_id((int) $shipment['incoming_request_id']) : null;
+if (($user['role'] ?? '') === 'staff' && is_array($incomingRequest) && strtolower((string) ($incomingRequest['assigned_to'] ?? '')) !== strtolower((string) ($user['email'] ?? ''))) {
+    $incomingRequest = null;
+}
 $relatedInvoices = bani_fetch_invoices_by_tracking_reference((string) ($shipment['reference'] ?? ''), ($user['role'] ?? '') === 'client' ? (string) ($user['email'] ?? '') : null);
 $staffUsers = bani_staff_users();
 $dashboardUrl = ($user['role'] ?? '') === 'admin'
