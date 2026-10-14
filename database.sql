@@ -177,3 +177,13 @@ ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_instructions TEXT N
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(190) NULL AFTER payment_instructions;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_notes TEXT NULL AFTER payment_reference;
 ALTER TABLE portal_invoices ADD COLUMN IF NOT EXISTS payment_submitted_at DATETIME NULL AFTER payment_notes;
+
+CREATE TABLE IF NOT EXISTS portal_password_resets (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(190) NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL,
+  INDEX idx_portal_password_resets_email (email),
+  INDEX idx_portal_password_resets_expiry (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
