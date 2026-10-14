@@ -343,7 +343,19 @@ function bani_fetch_shipment_updates(int $shipmentId): array
     $statement->execute([':shipment_id' => $shipmentId]);
     $rows = $statement->fetchAll();
 
-    return is_array($rows) ? $rows : [];
+    if (!is_array($rows)) {
+        return [];
+    }
+
+    foreach ($rows as &$row) {
+        $note = (string) ($row['notes'] ?? '');
+        $row['notes'] = str_starts_with($note, '[client] ')
+            ? substr($note, 9)
+            : null;
+    }
+    unset($row);
+
+    return $rows;
 }
 
 function bani_client_summary(string $clientEmail): array
@@ -481,6 +493,15 @@ function bani_update_incoming_request_status(int $requestId, array|string $input
         return ['success' => false, 'message' => 'A valid incoming request and status are required.'];
     }
 
+    $actor = bani_current_user();
+    if (is_array($actor) && ($actor['role'] ?? '') === 'staff') {
+        $existingRequest = bani_fetch_incoming_request_by_id($requestId);
+        if (!is_array($existingRequest) || strtolower((string) ($existingRequest['assigned_to'] ?? '')) !== strtolower((string) ($actor['email'] ?? ''))) {
+            return ['success' => false, 'message' => 'You can manage only incoming requests assigned to you.'];
+        }
+        $assignedTo = strtolower((string) ($existingRequest['assigned_to'] ?? ''));
+    }
+
     $assignedName = null;
     if ($assignedTo !== '') {
         $staff = bani_find_user($assignedTo);
@@ -604,6 +625,15 @@ function bani_update_quote_request(int $requestId, array $input): array
         return ['success' => false, 'message' => 'A valid quote request and status are required.'];
     }
 
+    $actor = bani_current_user();
+    if (is_array($actor) && ($actor['role'] ?? '') === 'staff') {
+        $existingRequest = bani_fetch_quote_request_by_id($requestId);
+        if (!is_array($existingRequest) || strtolower((string) ($existingRequest['assigned_to'] ?? '')) !== strtolower((string) ($actor['email'] ?? ''))) {
+            return ['success' => false, 'message' => 'You can manage only quote requests assigned to you.'];
+        }
+        $assignedTo = strtolower((string) ($existingRequest['assigned_to'] ?? ''));
+    }
+
     $assignedName = null;
     if ($assignedTo !== '') {
         $staff = bani_find_user($assignedTo);
@@ -660,7 +690,7 @@ function bani_log_shipment_update(array $shipment, string $status, string $nextS
         ':shipment_reference' => (string) $shipment['reference'],
         ':status' => $status,
         ':next_step' => $nextStep,
-        ':notes' => $notes !== null && trim($notes) !== '' ? trim($notes) : null,
+        ':notes' => $notes !== null && trim($notes) !== '' ? '[client] ' . trim($notes) : null,
         ':actor_email' => is_array($actor) ? (string) ($actor['email'] ?? '') : null,
         ':actor_name' => is_array($actor) ? (string) ($actor['name'] ?? '') : null,
         ':created_at' => gmdate('Y-m-d H:i:s'),
@@ -829,6 +859,15 @@ function bani_create_shipment(array $input): array
         return ['success' => false, 'message' => 'Please complete all shipment fields.'];
     }
 
+    $actor = bani_current_user();
+    if (is_array($actor) && ($actor['role'] ?? '') === 'staff') {
+        $incoming = $incomingRequestId > 0 ? bani_fetch_incoming_request_by_id($incomingRequestId) : null;
+        if (!is_array($incoming) || strtolower((string) ($incoming['assigned_to'] ?? '')) !== strtolower((string) ($actor['email'] ?? ''))) {
+            return ['success' => false, 'message' => 'Staff can create shipments only by converting an incoming request assigned to them.'];
+        }
+        $assignedTo = strtolower((string) ($actor['email'] ?? ''));
+    }
+
     $client = bani_find_user($clientEmail);
     if ($client === null || ($client['role'] ?? '') !== 'client') {
         return ['success' => false, 'message' => 'Select a valid client account for this shipment.'];
@@ -881,7 +920,7 @@ function bani_create_shipment(array $input): array
             $createdShipment,
             $status,
             $nextStep,
-            trim((string) ($input['internal_notes'] ?? '')) !== '' ? (string) ($input['internal_notes'] ?? '') : 'Shipment opened in the portal.'
+            'Shipment received and is being processed.'
         );
     }
 
@@ -915,10 +954,18 @@ function bani_update_shipment(int $shipmentId, array $input): array
         return ['success' => false, 'message' => 'Shipment record was not found.'];
     }
 
+    $actor = bani_current_user();
+    $isStaff = is_array($actor) && ($actor['role'] ?? '') === 'staff';
+    $currentAssignee = strtolower(trim((string) ($shipment['assigned_to'] ?? '')));
+    if ($isStaff && $currentAssignee !== strtolower((string) ($actor['email'] ?? ''))) {
+        return ['success' => false, 'message' => 'You can update only shipments assigned to you.'];
+    }
+
     $status = trim((string) ($input['status'] ?? $shipment['status']));
     $nextStep = trim((string) ($input['next_step'] ?? $shipment['next_step']));
-    $assignedTo = strtolower(trim((string) ($input['assigned_to'] ?? $shipment['assigned_to'] ?? '')));
+    $assignedTo = $isStaff ? $currentAssignee : strtolower(trim((string) ($input['assigned_to'] ?? $shipment['assigned_to'] ?? '')));
     $internalNotes = trim((string) ($input['internal_notes'] ?? $shipment['internal_notes'] ?? ''));
+    $customerUpdate = trim((string) ($input['customer_update'] ?? ''));
 
     if ($status === '' || $nextStep === '') {
         return ['success' => false, 'message' => 'Status and next step are required for shipment updates.'];
@@ -954,7 +1001,7 @@ function bani_update_shipment(int $shipmentId, array $input): array
         ':id' => $shipmentId,
     ]);
 
-    $noteSummary = $internalNotes !== '' ? $internalNotes : 'Shipment milestone updated.';
+    $noteSummary = $customerUpdate !== '' ? $customerUpdate : null;
     bani_log_shipment_update([
         'id' => $shipmentId,
         'reference' => (string) ($shipment['reference'] ?? ''),
@@ -971,9 +1018,17 @@ function bani_convert_incoming_request_to_shipment(int $requestId, array $input)
         return ['success' => false, 'message' => 'Incoming request was not found.'];
     }
 
+    $actor = bani_current_user();
+    if (is_array($actor) && ($actor['role'] ?? '') === 'staff') {
+        if (strtolower((string) ($incoming['assigned_to'] ?? '')) !== strtolower((string) ($actor['email'] ?? ''))) {
+            return ['success' => false, 'message' => 'You can convert only incoming requests assigned to you.'];
+        }
+        $assignedTo = strtolower((string) ($actor['email'] ?? ''));
+    }
+
     $mode = trim((string) ($input['mode'] ?? ''));
     $destination = trim((string) ($input['destination'] ?? ''));
-    $assignedTo = trim((string) ($input['assigned_to'] ?? ''));
+    $assignedTo = is_array($actor) && ($actor['role'] ?? '') === 'staff' ? (string) ($actor['email'] ?? '') : trim((string) ($input['assigned_to'] ?? ''));
     $nextStep = trim((string) ($input['next_step'] ?? ''));
 
     if ($mode === '' || $destination === '' || $nextStep === '') {
@@ -1014,6 +1069,29 @@ function bani_convert_incoming_request_to_shipment(int $requestId, array $input)
     ];
 }
 
+function bani_staff_can_access_invoice(array $invoice, string $staffEmail): bool
+{
+    $reference = strtoupper(trim((string) ($invoice['tracking_reference'] ?? '')));
+    $staffEmail = strtolower(trim($staffEmail));
+    $pdo = bani_db();
+
+    if ($reference === '' || $staffEmail === '' || !$pdo instanceof PDO || !bani_records_table_available('portal_shipments')) {
+        return false;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT 1 FROM portal_shipments
+         WHERE UPPER(reference) = :reference AND LOWER(assigned_to) = :assigned_to
+         LIMIT 1'
+    );
+    $statement->execute([
+        ':reference' => $reference,
+        ':assigned_to' => $staffEmail,
+    ]);
+
+    return (bool) $statement->fetchColumn();
+}
+
 function bani_update_invoice_status(int $invoiceId, string $status): array
 {
     $pdo = bani_db();
@@ -1025,6 +1103,17 @@ function bani_update_invoice_status(int $invoiceId, string $status): array
     $status = trim($status);
     if ($status === '') {
         return ['success' => false, 'message' => 'Invoice status is required.'];
+    }
+
+    $actor = bani_current_user();
+    if (!is_array($actor) || !in_array((string) ($actor['role'] ?? ''), ['admin', 'staff'], true)) {
+        return ['success' => false, 'message' => 'You do not have permission to update invoices.'];
+    }
+    if (($actor['role'] ?? '') === 'staff') {
+        $invoice = bani_fetch_invoice_by_id($invoiceId);
+        if (!is_array($invoice) || !bani_staff_can_access_invoice($invoice, (string) ($actor['email'] ?? ''))) {
+            return ['success' => false, 'message' => 'You can update only invoices linked to shipments assigned to you.'];
+        }
     }
 
     $statement = $pdo->prepare('UPDATE portal_invoices SET status = :status, updated_at = :updated_at WHERE id = :id');
@@ -1148,6 +1237,11 @@ function bani_create_quote(array $input): array
 
 function bani_create_invoice(array $input): array
 {
+    $actor = bani_current_user();
+    if (!is_array($actor) || ($actor['role'] ?? '') !== 'admin') {
+        return ['success' => false, 'message' => 'Only administrators can create invoices.'];
+    }
+
     $pdo = bani_db();
 
     if (!$pdo instanceof PDO || !bani_records_table_available('portal_invoices')) {
