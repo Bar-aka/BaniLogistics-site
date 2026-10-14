@@ -12,6 +12,10 @@ if (!is_array($incoming)) {
     http_response_code(404);
     exit('Incoming request not found.');
 }
+if (($user['role'] ?? '') === 'staff' && strtolower((string) ($incoming['assigned_to'] ?? '')) !== strtolower((string) ($user['email'] ?? ''))) {
+    http_response_code(403);
+    exit('You can view only incoming requests assigned to you.');
+}
 
 $recordMessage = '';
 $recordError = '';
@@ -136,6 +140,7 @@ $whatsAppMessage = 'Hello ' . (string) ($incoming['client_name'] ?? 'Client') . 
                   <?php endforeach; ?>
                 </select>
               </label>
+              <?php if (($user['role'] ?? '') === 'admin'): ?>
               <label>
                 Assign To
                 <select name="assigned_to">
@@ -147,6 +152,7 @@ $whatsAppMessage = 'Hello ' . (string) ($incoming['client_name'] ?? 'Client') . 
                   <?php endforeach; ?>
                 </select>
               </label>
+              <?php endif; ?>
             </div>
             <label>
               Internal Notes
