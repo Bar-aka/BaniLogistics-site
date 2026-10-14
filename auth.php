@@ -339,6 +339,13 @@ function bani_current_user(): ?array
         return null;
     }
 
+    $sessionFingerprint = (string) ($user['auth_password_fingerprint'] ?? '');
+    $freshFingerprint = hash('sha256', (string) ($freshUser['password_hash'] ?? ''));
+    if ($sessionFingerprint === '' || !hash_equals($freshFingerprint, $sessionFingerprint)) {
+        bani_logout();
+        return null;
+    }
+
     $_SESSION['bani_user'] = [
         'email' => $freshUser['email'],
         'role' => $freshUser['role'],
@@ -408,6 +415,7 @@ function bani_login(string $identifier, string $password, string $role): array
         'status' => $freshUser['status'],
         'created_at' => $freshUser['created_at'],
         'last_login_at' => $freshUser['last_login_at'],
+        'auth_password_fingerprint' => hash('sha256', (string) ($freshUser['password_hash'] ?? '')),
     ];
 
     return ['success' => true, 'message' => 'Login successful.'];
@@ -579,6 +587,215 @@ function bani_update_user_status(string $email, string $status): bool
     bani_save_file_users($users);
 
     return true;
+}
+
+function bani_csrf_token(): string
+{
+    if (!isset($_SESSION['bani_csrf_token']) || !is_string($_SESSION['bani_csrf_token'])) {
+        $_SESSION['bani_csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    return (string) $_SESSION['bani_csrf_token'];
+}
+
+function bani_verify_csrf_token(string $token): bool
+{
+    $saved = $_SESSION['bani_csrf_token'] ?? '';
+
+    return is_string($saved) && $saved !== '' && hash_equals($saved, $token);
+}
+
+function bani_password_reset_requests_path(): string
+{
+    return bani_storage_dir() . DIRECTORY_SEPARATOR . 'password-resets.json';
+}
+
+function bani_password_reset_rows(): array
+{
+    bani_ensure_storage();
+    $contents = @file_get_contents(bani_password_reset_requests_path());
+    $rows = json_decode($contents ?: '[]', true);
+
+    return is_array($rows) ? $rows : [];
+}
+
+function bani_save_password_reset_rows(array $rows): bool
+{
+    $json = json_encode(array_values($rows), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    return $json !== false && file_put_contents(bani_password_reset_requests_path(), $json . PHP_EOL, LOCK_EX) !== false;
+}
+
+function bani_password_reset_database(): ?PDO
+{
+    $pdo = bani_db();
+    if (!$pdo instanceof PDO) {
+        return null;
+    }
+
+    try {
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS portal_password_resets (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                email VARCHAR(190) NOT NULL,
+                token_hash CHAR(64) NOT NULL UNIQUE,
+                expires_at DATETIME NOT NULL,
+                created_at DATETIME NOT NULL,
+                INDEX idx_portal_password_resets_email (email),
+                INDEX idx_portal_password_resets_expiry (expires_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+        return $pdo;
+    } catch (Throwable $exception) {
+        return null;
+    }
+}
+
+function bani_send_staff_password_reset(string $email): array
+{
+    $actor = bani_current_user();
+    if (!is_array($actor) || ($actor['role'] ?? '') !== 'admin') {
+        return ['success' => false, 'message' => 'Only administrators can send staff reset links.'];
+    }
+
+    $user = bani_find_user($email);
+    if (!is_array($user) || ($user['role'] ?? '') !== 'staff') {
+        return ['success' => false, 'message' => 'The staff account could not be found.'];
+    }
+
+    $email = strtolower(trim((string) ($user['email'] ?? '')));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return ['success' => false, 'message' => 'A valid staff email is required to send a reset link.'];
+    }
+
+    $token = bin2hex(random_bytes(32));
+    $tokenHash = hash('sha256', $token);
+    $expiresAt = gmdate('Y-m-d H:i:s', time() + 3600);
+    $pdo = bani_password_reset_database();
+
+    if ($pdo instanceof PDO) {
+        $delete = $pdo->prepare('DELETE FROM portal_password_resets WHERE email = :email');
+        $delete->execute([':email' => $email]);
+        $insert = $pdo->prepare(
+            'INSERT INTO portal_password_resets (email, token_hash, expires_at, created_at)
+             VALUES (:email, :token_hash, :expires_at, :created_at)'
+        );
+        $saved = $insert->execute([
+            ':email' => $email,
+            ':token_hash' => $tokenHash,
+            ':expires_at' => $expiresAt,
+            ':created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+    } else {
+        $rows = array_values(array_filter(
+            bani_password_reset_rows(),
+            static fn(array $row): bool => strtolower((string) ($row['email'] ?? '')) !== $email
+        ));
+        $rows[] = ['email' => $email, 'token_hash' => $tokenHash, 'expires_at' => $expiresAt];
+        $saved = bani_save_password_reset_rows($rows);
+    }
+
+    if (!$saved) {
+        return ['success' => false, 'message' => 'Unable to prepare a password reset link.'];
+    }
+
+    $url = 'https://banilogistics.co.ke/password-reset.php?token=' . rawurlencode($token);
+    $subject = 'Bani Logistics staff password reset';
+    $body = "A password reset was requested for your staff account.\n\n"
+        . "Open this one-time link within 60 minutes to choose a new password:\n" . $url . "\n\n"
+        . "If you did not request this, ignore this email.\n";
+    $headers = "From: Bani Global Logistics <operations@banilogistics.co.ke>\r\n"
+        . "Content-Type: text/plain; charset=UTF-8\r\n";
+
+    if (!mail($email, $subject, $body, $headers)) {
+        if ($pdo instanceof PDO) {
+            $delete = $pdo->prepare('DELETE FROM portal_password_resets WHERE token_hash = :token_hash');
+            $delete->execute([':token_hash' => $tokenHash]);
+        } else {
+            $rows = array_values(array_filter(
+                bani_password_reset_rows(),
+                static fn(array $row): bool => !hash_equals((string) ($row['token_hash'] ?? ''), $tokenHash)
+            ));
+            bani_save_password_reset_rows($rows);
+        }
+        return ['success' => false, 'message' => 'The reset email could not be sent. Check cPanel email delivery settings.'];
+    }
+
+    error_log('Staff password reset link issued by admin for ' . $email);
+
+    return ['success' => true, 'message' => 'A one-time password reset link was sent to ' . $email . '.'];
+}
+
+function bani_complete_staff_password_reset(string $token, string $password, string $confirmPassword): array
+{
+    if (preg_match('/^[a-f0-9]{64}$/i', $token) !== 1) {
+        return ['success' => false, 'message' => 'This reset link is invalid or has expired.'];
+    }
+    if (strlen($password) < 12) {
+        return ['success' => false, 'message' => 'Use a password with at least 12 characters.'];
+    }
+    if ($password !== $confirmPassword) {
+        return ['success' => false, 'message' => 'The password fields do not match.'];
+    }
+
+    $tokenHash = hash('sha256', $token);
+    $pdo = bani_password_reset_database();
+    $email = '';
+    if ($pdo instanceof PDO) {
+        $statement = $pdo->prepare('SELECT email, expires_at FROM portal_password_resets WHERE token_hash = :token_hash LIMIT 1');
+        $statement->execute([':token_hash' => $tokenHash]);
+        $row = $statement->fetch();
+        if (is_array($row) && strtotime((string) $row['expires_at'] . ' UTC') > time()) {
+            $email = strtolower((string) $row['email']);
+        }
+    } else {
+        foreach (bani_password_reset_rows() as $row) {
+            if (
+                hash_equals((string) ($row['token_hash'] ?? ''), $tokenHash)
+                && strtotime((string) ($row['expires_at'] ?? '') . ' UTC') > time()
+            ) {
+                $email = strtolower((string) ($row['email'] ?? ''));
+                break;
+            }
+        }
+    }
+
+    $user = $email !== '' ? bani_find_user($email) : null;
+    if (!is_array($user) || ($user['role'] ?? '') !== 'staff') {
+        return ['success' => false, 'message' => 'This reset link is invalid or has expired.'];
+    }
+
+    $user['password_hash'] = password_hash($password, PASSWORD_DEFAULT);
+    if (bani_db_ready() && bani_db() instanceof PDO) {
+        $saved = bani_upsert_db_user($user);
+    } else {
+        $users = bani_load_file_users();
+        $index = bani_find_user_index($email, $users);
+        if ($index === null) {
+            return ['success' => false, 'message' => 'The staff account could not be updated.'];
+        }
+        $users[$index]['password_hash'] = $user['password_hash'];
+        bani_save_file_users($users);
+        $saved = true;
+    }
+
+    if (!$saved) {
+        return ['success' => false, 'message' => 'The password could not be updated. Please contact the administrator.'];
+    }
+
+    if ($pdo instanceof PDO) {
+        $delete = $pdo->prepare('DELETE FROM portal_password_resets WHERE token_hash = :token_hash');
+        $delete->execute([':token_hash' => $tokenHash]);
+    } else {
+        $rows = array_values(array_filter(
+            bani_password_reset_rows(),
+            static fn(array $row): bool => !hash_equals((string) ($row['token_hash'] ?? ''), $tokenHash)
+        ));
+        bani_save_password_reset_rows($rows);
+    }
+
+    error_log('Staff password reset completed for ' . $email);
+
+    return ['success' => true, 'message' => 'Password reset successfully. You can now sign in with your new password.'];
 }
 
 function bani_format_datetime(?string $value): string
