@@ -17,6 +17,10 @@ if (($user['role'] ?? '') === 'client' && strtolower((string) ($invoice['client_
     http_response_code(403);
     exit('You do not have permission to view this invoice.');
 }
+if (($user['role'] ?? '') === 'staff' && !bani_staff_can_access_invoice($invoice, (string) ($user['email'] ?? ''))) {
+    http_response_code(403);
+    exit('You can view only invoices linked to shipments assigned to you.');
+}
 
 $recordMessage = '';
 $recordError = '';
