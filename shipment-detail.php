@@ -17,6 +17,10 @@ if (($user['role'] ?? '') === 'client' && strtolower((string) ($shipment['client
     http_response_code(403);
     exit('You do not have permission to view this shipment.');
 }
+if (($user['role'] ?? '') === 'staff' && strtolower((string) ($shipment['assigned_to'] ?? '')) !== strtolower((string) ($user['email'] ?? ''))) {
+    http_response_code(403);
+    exit('You can view only shipments assigned to you.');
+}
 
 $recordMessage = '';
 $recordError = '';
@@ -171,6 +175,7 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin'
                       <?php endforeach; ?>
                     </select>
                   </label>
+                  <?php if (($user['role'] ?? '') === 'admin'): ?>
                   <label>
                     Assigned To
                     <select name="assigned_to">
@@ -182,14 +187,19 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin'
                       <?php endforeach; ?>
                     </select>
                   </label>
+                  <?php endif; ?>
                 </div>
                 <label>
                   Next Step
                   <input type="text" name="next_step" value="<?= htmlspecialchars((string) ($shipment['next_step'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
                 </label>
                 <label>
-                  Internal Notes
-                  <textarea name="internal_notes" placeholder="Operational note"><?= htmlspecialchars((string) ($shipment['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                  Update for Client
+                  <textarea name="customer_update" placeholder="A short update the client can see"></textarea>
+                </label>
+                <label>
+                  Internal Notes (staff and admin only)
+                  <textarea name="internal_notes" placeholder="Private operational note"><?= htmlspecialchars((string) ($shipment['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
                 </label>
                 <button type="submit">Save Shipment Update</button>
               </form>
