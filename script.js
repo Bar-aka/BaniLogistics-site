@@ -1,6 +1,65 @@
 const contactForm = document.getElementById("contactForm");
 const contactResult = document.getElementById("contactResult");
 
+function createQuoteContactMessage(form) {
+  const labels = {
+    request_type: "Request type",
+    name: "Name",
+    email: "Email",
+    phone: "Phone / WhatsApp",
+    type: "Shipment type",
+    origin: "Origin",
+    destination: "Destination",
+    mode: "Freight mode",
+    weight: "Weight (kg)",
+    product_category: "Product category",
+    quantity: "Quantity",
+    market: "Preferred sourcing market",
+    budget: "Budget range",
+    notes: "Cargo notes",
+    product_details: "Product details"
+  };
+  const lines = ["Bani Global Logistics quote request"];
+  new FormData(form).forEach(function (value, key) {
+    const text = String(value).trim();
+    if (key !== "request_type" && text) {
+      lines.push((labels[key] || key) + ": " + text);
+    }
+  });
+  return lines.join("\n");
+}
+
+function appendQuoteContactActions(result, message, emailAccepted, requestSaved) {
+  const note = document.createElement("p");
+  note.textContent = requestSaved
+    ? (emailAccepted
+      ? "Operations has been notified by email. To send a WhatsApp copy too, open WhatsApp below and tap Send."
+      : "We couldn't confirm the email notification. Your request may be saved; use WhatsApp or email below to contact operations.")
+    : "The website couldn't confirm your request. You can still send it directly to operations using either option below.";
+  result.appendChild(note);
+
+  const actions = document.createElement("div");
+  actions.className = "hero-actions quote-followup-actions";
+
+  const whatsappLink = document.createElement("a");
+  whatsappLink.className = "button primary";
+  whatsappLink.href = "https://wa.me/254782013236?text=" + encodeURIComponent(message);
+  whatsappLink.target = "_blank";
+  whatsappLink.rel = "noopener noreferrer";
+  whatsappLink.textContent = "Send WhatsApp copy";
+
+  const emailLink = document.createElement("a");
+  emailLink.className = "button secondary";
+  emailLink.href = "mailto:operations@banilogistics.co.ke?subject="
+    + encodeURIComponent("Website quote request")
+    + "&body=" + encodeURIComponent(message);
+  emailLink.textContent = "Email operations";
+
+  actions.appendChild(whatsappLink);
+  actions.appendChild(emailLink);
+  result.appendChild(actions);
+}
+
 async function submitQuoteRequest(formId, resultId) {
   const form = document.getElementById(formId);
   const result = document.getElementById(resultId);
@@ -14,6 +73,7 @@ async function submitQuoteRequest(formId, resultId) {
 
     const button = form.querySelector('button[type="submit"]');
     const originalLabel = button ? button.textContent : "";
+    const contactMessage = createQuoteContactMessage(form);
     result.className = "result-box show";
     result.textContent = "Sending your request…";
 
@@ -36,6 +96,12 @@ async function submitQuoteRequest(formId, resultId) {
 
       result.className = "result-box show result-success";
       result.textContent = payload.message || "Your quote request has been received.";
+      appendQuoteContactActions(
+        result,
+        contactMessage,
+        payload.email_notification_accepted === true,
+        true
+      );
       form.reset();
       result.focus();
     } catch (error) {
