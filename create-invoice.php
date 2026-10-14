@@ -37,9 +37,10 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin' ? 'admin-dashboard.php' : 'sta
     <header class="site-header">
       <div class="nav-wrap">
         <a class="brand" href="index.html" aria-label="Bani Global Logistics Limited home">
-          <img src="/images/logo.png" alt="Bani Global Logistics Limited Logo">
+          <img src="/logo.png" alt="Bani Global Logistics Limited Logo">
         </a>
-        <nav class="site-nav" aria-label="Main navigation">
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">Menu</button>
+        <nav id="site-navigation" class="site-nav" aria-label="Main navigation">
           <a href="index.html">Home</a>
           <a href="<?= htmlspecialchars($dashboardUrl, ENT_QUOTES, 'UTF-8') ?>">Dashboard</a>
           <a class="active" href="create-invoice.php">Create Invoice</a>
@@ -201,6 +202,6 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin' ? 'admin-dashboard.php' : 'sta
       </section>
     </main>
 
-    <script src="/js/script.js"></script>
+    <script src="/script.js"></script>
   </body>
 </html>

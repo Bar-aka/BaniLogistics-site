@@ -1,7 +1,66 @@
 const contactForm = document.getElementById("contactForm");
 const contactResult = document.getElementById("contactResult");
 
-function bindQuoteForm(formId, resultId, messageBuilder) {
+function createQuoteContactMessage(form) {
+  const labels = {
+    request_type: "Request type",
+    name: "Name",
+    email: "Email",
+    phone: "Phone / WhatsApp",
+    type: "Shipment type",
+    origin: "Origin",
+    destination: "Destination",
+    mode: "Freight mode",
+    weight: "Weight (kg)",
+    product_category: "Product category",
+    quantity: "Quantity",
+    market: "Preferred sourcing market",
+    budget: "Budget range",
+    notes: "Cargo notes",
+    product_details: "Product details"
+  };
+  const lines = ["Bani Global Logistics quote request"];
+  new FormData(form).forEach(function (value, key) {
+    const text = String(value).trim();
+    if (key !== "request_type" && text) {
+      lines.push((labels[key] || key) + ": " + text);
+    }
+  });
+  return lines.join("\n");
+}
+
+function appendQuoteContactActions(result, message, emailAccepted, requestSaved) {
+  const note = document.createElement("p");
+  note.textContent = requestSaved
+    ? (emailAccepted
+      ? "Operations has been notified by email. To send a WhatsApp copy too, open WhatsApp below and tap Send."
+      : "We couldn't confirm the email notification. Your request may be saved; use WhatsApp or email below to contact operations.")
+    : "The website couldn't confirm your request. You can still send it directly to operations using either option below.";
+  result.appendChild(note);
+
+  const actions = document.createElement("div");
+  actions.className = "hero-actions quote-followup-actions";
+
+  const whatsappLink = document.createElement("a");
+  whatsappLink.className = "button primary";
+  whatsappLink.href = "https://wa.me/254782013236?text=" + encodeURIComponent(message);
+  whatsappLink.target = "_blank";
+  whatsappLink.rel = "noopener noreferrer";
+  whatsappLink.textContent = "Send WhatsApp copy";
+
+  const emailLink = document.createElement("a");
+  emailLink.className = "button secondary";
+  emailLink.href = "mailto:operations@banilogistics.co.ke?subject="
+    + encodeURIComponent("Website quote request")
+    + "&body=" + encodeURIComponent(message);
+  emailLink.textContent = "Email operations";
+
+  actions.appendChild(whatsappLink);
+  actions.appendChild(emailLink);
+  result.appendChild(actions);
+}
+
+async function submitQuoteRequest(formId, resultId) {
   const form = document.getElementById(formId);
   const result = document.getElementById(resultId);
 
@@ -9,42 +68,57 @@ function bindQuoteForm(formId, resultId, messageBuilder) {
     return;
   }
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
 
-    const formData = new FormData(form);
-    result.classList.add("show");
-    result.innerHTML = messageBuilder(formData);
-    form.reset();
+    const button = form.querySelector('button[type="submit"]');
+    const originalLabel = button ? button.textContent : "";
+    const contactMessage = createQuoteContactMessage(form);
+    result.className = "result-box show";
+    result.textContent = "Sending your request…";
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Sending…";
+    }
+
+    try {
+      const response = await fetch(form.action || "quote-request.php", {
+        method: "POST",
+        body: new FormData(form),
+        headers: { Accept: "application/json" }
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || "We couldn’t submit your request. Please try again.");
+      }
+
+      result.className = "result-box show result-success";
+      result.textContent = payload.message || "Your quote request has been received.";
+      appendQuoteContactActions(
+        result,
+        contactMessage,
+        payload.email_notification_accepted === true,
+        true
+      );
+      form.reset();
+      result.focus();
+    } catch (error) {
+      result.className = "result-box show result-error";
+      result.textContent = error.message || "We couldn’t send your request. Please try again or contact our team directly.";
+      result.focus();
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    }
   });
 }
 
-bindQuoteForm("shippingQuoteForm", "shippingQuoteResult", function (formData) {
-  const name = (formData.get("name") || "Client").toString();
-  const origin = (formData.get("origin") || "Origin").toString();
-  const destination = (formData.get("destination") || "Destination").toString();
-  const mode = (formData.get("mode") || "Freight").toString();
-
-  return (
-    "<strong>Shipping quote request received.</strong>" +
-    "<p>Thank you, " + name + ". Your " + mode + " request from " + origin +
-    " to " + destination + " has been recorded. Our team will review the route, handling scope, and delivery timeline before sharing the estimate.</p>"
-  );
-});
-
-bindQuoteForm("sourcingQuoteForm", "sourcingQuoteResult", function (formData) {
-  const name = (formData.get("name") || "Client").toString();
-  const category = (formData.get("product_category") || "the requested items").toString();
-  const quantity = (formData.get("quantity") || "your requested quantity").toString();
-  const market = (formData.get("market") || "").toString().trim();
-
-  return (
-    "<strong>Sourcing request received.</strong>" +
-    "<p>Thank you, " + name + ". We have logged your request for " + quantity +
-    " of " + category + (market ? " from " + market : "") +
-    ". Our team will review the specifications and confirm any extra sourcing details needed to proceed.</p>"
-  );
-});
+submitQuoteRequest("shippingQuoteForm", "shippingQuoteResult");
+submitQuoteRequest("sourcingQuoteForm", "sourcingQuoteResult");
 
 function baniChatbotReply(message) {
   const text = (message || "").toLowerCase();
@@ -175,21 +249,6 @@ if (document.readyState === "loading") {
   initializeBaniChatbot();
 }
 
-if (contactForm && contactResult) {
-  contactForm.addEventListener("submit", function (event) {
-    event.preventDefault();
-
-    const formData = new FormData(contactForm);
-    const name = formData.get("name") || "Client";
-
-    contactResult.classList.add("show");
-    contactResult.innerHTML =
-      "<strong>Message received.</strong>" +
-      "<p>Thank you, " + name + ". Your message has been captured for follow-up.</p>";
-
-    contactForm.reset();
-  });
-}
 
 
 const trackingInput = document.getElementById("trackingInput");
@@ -260,7 +319,7 @@ function fallbackTrackingResult(key) {
       badge: "Not Found",
       title: "Tracking number not found.",
       text: "Please confirm the reference and try again. Available references: BG000001, BG000014, BG000027.",
-      source: "Tracking source: local fallback",
+      source: "Demo data — not a live shipment status",
       details: ["Use one of the listed shipment references above."]
     };
   }
@@ -269,7 +328,7 @@ function fallbackTrackingResult(key) {
     badge: entry.badge,
     title: entry.title,
     text: entry.text,
-    source: "Tracking source: local fallback",
+    source: "Demo data — not a live shipment status",
     details: entry.details
   };
 }
@@ -384,3 +443,36 @@ if (trackingInput) {
     }
   });
 }
+
+
+// Accessible collapsible navigation for smaller screens.
+document.querySelectorAll(".nav-toggle").forEach(function (button) {
+  const navId = button.getAttribute("aria-controls");
+  const nav = navId ? document.getElementById(navId) : null;
+
+  if (!nav) {
+    return;
+  }
+
+  function setExpanded(expanded) {
+    button.setAttribute("aria-expanded", String(expanded));
+    nav.classList.toggle("is-open", expanded);
+  }
+
+  button.addEventListener("click", function () {
+    setExpanded(button.getAttribute("aria-expanded") !== "true");
+  });
+
+  nav.querySelectorAll("a").forEach(function (link) {
+    link.addEventListener("click", function () {
+      setExpanded(false);
+    });
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && button.getAttribute("aria-expanded") === "true") {
+      setExpanded(false);
+      button.focus();
+    }
+  });
+});

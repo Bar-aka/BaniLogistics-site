@@ -51,9 +51,10 @@ $whatsAppMessage = 'Hello ' . (string) ($incoming['client_name'] ?? 'Client') . 
     <header class="site-header">
       <div class="nav-wrap">
         <a class="brand" href="index.html" aria-label="Bani Global Logistics Limited home">
-          <img src="/images/logo.png" alt="Bani Global Logistics Limited Logo">
+          <img src="/logo.png" alt="Bani Global Logistics Limited Logo">
         </a>
-        <nav class="site-nav" aria-label="Main navigation">
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">Menu</button>
+        <nav id="site-navigation" class="site-nav" aria-label="Main navigation">
           <a href="index.html">Home</a>
           <a href="<?= htmlspecialchars($dashboardUrl, ENT_QUOTES, 'UTF-8') ?>">Dashboard</a>
           <a class="active" href="incoming-request-detail.php?id=<?= (int) $requestId ?>">Incoming Request</a>
@@ -198,6 +199,6 @@ $whatsAppMessage = 'Hello ' . (string) ($incoming['client_name'] ?? 'Client') . 
         <?php endif; ?>
       </section>
     </main>
-    <script src="/js/script.js"></script>
+    <script src="/script.js"></script>
   </body>
 </html>
