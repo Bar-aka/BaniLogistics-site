@@ -284,39 +284,6 @@ const statusText = document.getElementById("statusText");
 const statusSource = document.getElementById("statusSource");
 const statusDetails = document.getElementById("statusDetails");
 
-const trackingData = {
-  BG000001: {
-    badge: "In Transit",
-    title: "Shipment is moving to the destination hub.",
-    text: "Cargo has departed the origin station and is now in line-haul transit.",
-    details: [
-      "Reference: BG000001",
-      "Last checkpoint: Dubai transit hub",
-      "Next step: Arrival scan at destination"
-    ]
-  },
-  BG000014: {
-    badge: "Customs",
-    title: "Shipment is currently under customs handling.",
-    text: "Documentation review and clearance processing are in progress.",
-    details: [
-      "Reference: BG000014",
-      "Last checkpoint: Port customs office",
-      "Next step: Release for dispatch"
-    ]
-  },
-  BG000027: {
-    badge: "Out for Delivery",
-    title: "Shipment is on the final delivery route.",
-    text: "Cargo has cleared operations and is assigned for last-mile handoff.",
-    details: [
-      "Reference: BG000027",
-      "Last checkpoint: Nairobi delivery station",
-      "Next step: Customer delivery confirmation"
-    ]
-  }
-};
-
 function renderStatusCard(entry) {
   if (!trackingStatus || !statusBadge || !statusTitle || !statusText || !statusDetails) {
     return;
