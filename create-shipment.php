@@ -4,7 +4,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/portal-data.php';
 
-$user = bani_require_roles(['admin', 'staff'], 'staff');
+bani_require_role('admin');
+$user = bani_current_user();
 $clientAccounts = bani_list_users('client');
 $staffUsers = bani_staff_users();
 $recordError = '';
