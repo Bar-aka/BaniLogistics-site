@@ -339,7 +339,6 @@ function bani_current_user(): ?array
         return null;
     }
 
-    session_regenerate_id(true);
     $_SESSION['bani_user'] = [
         'email' => $freshUser['email'],
         'role' => $freshUser['role'],
@@ -399,6 +398,7 @@ function bani_login(string $identifier, string $password, string $role): array
 
     $freshUser = bani_find_user($email) ?? $user;
 
+    session_regenerate_id(true);
     $_SESSION['bani_user'] = [
         'email' => $freshUser['email'],
         'role' => $freshUser['role'],
