@@ -173,7 +173,7 @@ $dashboardUrl = ($user['role'] ?? '') === 'admin'
                   <label>
                     Status
                     <select name="status">
-                      <?php foreach (['Submitted', 'Order Confirmed', 'In Transit', 'Customs Clearance', 'Released from Customs', 'Out for Delivery', 'Delivered'] as $statusOption): ?>
+                      <?php foreach (['Submitted', 'Order Confirmed', 'At Port', 'In Transit', 'Customs Clearance', 'Released from Customs', 'Out for Delivery', 'Delivered'] as $statusOption): ?>
                         <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"<?= (($shipment['status'] ?? '') === $statusOption) ? ' selected' : '' ?>><?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?></option>
                       <?php endforeach; ?>
                     </select>
