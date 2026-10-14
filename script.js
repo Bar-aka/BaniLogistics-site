@@ -191,6 +191,26 @@ function initializeBaniChatbot() {
   document.body.appendChild(toggle);
   document.body.appendChild(panel);
 
+  // Keep the assistant usable if a stale or missing stylesheet leaves it in document flow.
+  if (window.getComputedStyle(panel).position !== "fixed") {
+    const fallbackStyle = document.createElement("style");
+    fallbackStyle.textContent =
+      ".bani-chatbot-toggle{position:fixed!important;right:24px;bottom:24px;z-index:10001}" +
+      ".bani-chatbot{display:none;position:fixed!important;right:24px;bottom:88px;z-index:10000;width:min(380px,calc(100vw - 32px));max-height:calc(100vh - 112px);background:#fff;border:1px solid #d8e1ee;border-radius:18px;box-shadow:0 18px 50px rgba(15,35,65,.22);overflow:hidden}" +
+      ".bani-chatbot.show{display:flex;flex-direction:column}" +
+      ".bani-chatbot-header{display:flex;justify-content:space-between;align-items:center;padding:16px;background:#12345a;color:#fff}" +
+      ".bani-chatbot-header span{display:block;font-size:.85rem;opacity:.82}" +
+      ".bani-chatbot-body{display:flex;flex-direction:column;min-height:0}" +
+      ".bani-chatbot-messages{padding:14px;overflow:auto;max-height:280px}" +
+      ".bani-chatbot-message{margin:0 0 10px;padding:10px 12px;border-radius:12px;line-height:1.45;background:#eef3f9}" +
+      ".bani-chatbot-message.user{margin-left:28px;background:#e5efff}" +
+      ".bani-chatbot-actions{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px}" +
+      ".bani-chatbot-form{display:flex;gap:8px;padding:12px;border-top:1px solid #e5eaf1}" +
+      ".bani-chatbot-form input{min-width:0;flex:1}" +
+      "@media(max-width:480px){.bani-chatbot{right:12px;bottom:76px;width:calc(100vw - 24px)}.bani-chatbot-toggle{right:12px;bottom:12px}}";
+    document.head.appendChild(fallbackStyle);
+  }
+
   const messages = document.getElementById("baniChatbotMessages");
   const form = document.getElementById("baniChatbotForm");
   const input = document.getElementById("baniChatbotInput");
