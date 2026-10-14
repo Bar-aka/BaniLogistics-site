@@ -13,7 +13,7 @@ $labels = [
 ];
 
 $error = '';
-$success = '';
+$success = ($_GET['reset'] ?? '') === 'success' ? 'Your password has been reset. Sign in with your new password.' : '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $identifier = $_POST['identifier'] ?? '';
@@ -80,6 +80,9 @@ if ($currentUser) {
         <article class="dashboard-card">
           <h2>Portal Login</h2>
           <p class="dashboard-subtitle">Choose your role and continue to the correct workspace.</p>
+          <?php if ($success !== ''): ?>
+            <div class="result-box show result-success"><strong>Password updated.</strong><p><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></p></div>
+          <?php endif; ?>
           <?php if ($error !== ''): ?>
             <div class="result-box show"><strong>Login failed.</strong><p><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p></div>
           <?php endif; ?>
