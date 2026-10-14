@@ -8,13 +8,25 @@ bani_require_role('admin');
 
 $accountMessage = '';
 $accountError = '';
+$resetCsrfToken = bani_csrf_token();
 $recordMessage = '';
 $recordError = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string) ($_POST['action'] ?? '');
 
-    if ($action === 'update-account-status') {
+    if ($action === 'send-staff-password-reset') {
+        if (!bani_verify_csrf_token((string) ($_POST['csrf_token'] ?? ''))) {
+            $accountError = 'The request expired. Refresh the page and try again.';
+        } else {
+            $resetResult = bani_send_staff_password_reset((string) ($_POST['staff_email'] ?? ''));
+            if (($resetResult['success'] ?? false) === true) {
+                $accountMessage = (string) $resetResult['message'];
+            } else {
+                $accountError = (string) ($resetResult['message'] ?? 'Unable to send a reset link.');
+            }
+        }
+    } elseif ($action === 'update-account-status') {
         $accountEmail = (string) ($_POST['account_email'] ?? '');
         $accountStatus = (string) ($_POST['account_status'] ?? '');
 
@@ -392,7 +404,15 @@ $assignedIncomingRequests = count(array_filter($incomingRequests, static fn(arra
                   <?= htmlspecialchars((string) ($staffUser['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
                   <small><?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
                 </span>
-                <span><?= count($owned) + count($ownedQuotes) + count($ownedIncoming) ?> active tasks</span>
+                <span>
+                  <?= count($owned) + count($ownedQuotes) + count($ownedIncoming) ?> active tasks
+                  <form method="post" action="admin-dashboard.php" class="inline-actions">
+                    <input type="hidden" name="action" value="send-staff-password-reset">
+                    <input type="hidden" name="staff_email" value="<?= htmlspecialchars((string) ($staffUser['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($resetCsrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                    <button type="submit">Email password reset link</button>
+                  </form>
+                </span>
               </li>
             <?php endforeach; ?>
             <?php if ($staffUsers === []): ?>
