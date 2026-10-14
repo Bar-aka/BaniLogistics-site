@@ -131,8 +131,8 @@ function baniChatbotReply(message) {
     return "Use the tracking page or your client dashboard to view shipment progress. If a shipment has been created for your account, it will appear in your portal with its next milestone.";
   }
 
-  if (text.includes("quote") || text.includes("pricing")) {
-    return "You can request either a shipping quote or a sourcing quote. Shipping quotes are for known cargo movements, while sourcing quotes are for goods you still need help finding or buying.";
+  if (text.includes("quote") || text.includes("pricing") || text.includes("rate")) {
+    return "Quotes are reviewed manually while our rate card is being prepared. Send a shipping or sourcing request through the quote form, and our operations team will follow up by email or WhatsApp.";
   }
 
   if (text.includes("sourcing") || text.includes("source")) {
@@ -143,8 +143,12 @@ function baniChatbotReply(message) {
     return "Bani can support shipping and sourcing across major global markets including Australia, the USA, Hong Kong, China, Germany, the UAE, the UK, and other supplier regions depending on the cargo and route.";
   }
 
-  if (text.includes("contact") || text.includes("support")) {
-    return "You can reach operations on ops@banilogistics.co.ke, accounts on accounts@banilogistics.co.ke, or WhatsApp +254 782 013 236 for follow-up.";
+  if (text.includes("contact") || text.includes("support") || text.includes("speak to someone")) {
+    return "You can reach operations at operations@banilogistics.co.ke or WhatsApp +254 782 013 236. For invoice questions, contact accounts@banilogistics.co.ke.";
+  }
+
+  if (/^(hi|hello|hey|good morning|good afternoon)[!. ]*$/.test(text.trim())) {
+    return "Hello! I can help with general tracking, invoice payment steps, shipping coverage, sourcing requests, and quote requests.";
   }
 
   return "I can help with tracking shipments, invoice payment guidance, quote requests, sourcing requirements, and contact details. Try asking about tracking, payment, or quotes.";
@@ -306,99 +310,66 @@ function renderStatusCard(entry) {
     statusSource.textContent = entry.source || "";
   }
 
-  statusDetails.innerHTML = entry.details.map(function (item) {
-    return "<li>" + item + "</li>";
-  }).join("");
+  statusDetails.replaceChildren();
+  entry.details.forEach(function (item) {
+    const detail = document.createElement("li");
+    detail.textContent = item;
+    statusDetails.appendChild(detail);
+  });
 }
 
 function fallbackTrackingResult(key) {
-  const entry = trackingData[key];
-
-  if (!entry) {
-    return {
-      badge: "Not Found",
-      title: "Tracking number not found.",
-      text: "Please confirm the reference and try again. Available references: BG000001, BG000014, BG000027.",
-      source: "Demo data — not a live shipment status",
-      details: ["Use one of the listed shipment references above."]
-    };
-  }
-
   return {
-    badge: entry.badge,
-    title: entry.title,
-    text: entry.text,
-    source: "Demo data — not a live shipment status",
-    details: entry.details
+    badge: "Not Found",
+    title: "No shipment was found for that reference.",
+    text: "Check the reference and try again, or contact operations for help.",
+    source: "General public tracking",
+    details: ["Detailed shipment updates are available after signing in to the client portal."]
   };
 }
 
 function mapApiTrackingResult(payload, key) {
-  const shipment = payload && payload.shipment ? payload.shipment : null;
-  const updates = payload && Array.isArray(payload.updates) ? payload.updates : [];
-  const invoice = payload && payload.invoice ? payload.invoice : null;
-
-  if (!shipment) {
+  if (!payload || payload.success !== true || !payload.public_status) {
     return fallbackTrackingResult(key);
   }
 
-  const lastUpdate = updates.length ? updates[updates.length - 1] : null;
-  const details = [
-    "Reference: " + (shipment.tracking_number || key),
-    "Route: " + [shipment.origin || "Origin", shipment.destination || "Destination"].join(" to "),
-    "Current location: " + (shipment.current_location || "Awaiting location update"),
-    "Next step: " + (shipment.sub_status || shipment.status || "Awaiting next milestone")
-  ];
-
-  if (lastUpdate && lastUpdate.message) {
-    details.push("Latest update: " + lastUpdate.message);
-  }
-
-  if (invoice && invoice.invoice_id) {
-    details.push("Invoice: " + invoice.invoice_id + " (" + (invoice.status || "UNPAID") + ")");
+  const rawStatus = String(payload.public_status).toLowerCase();
+  let publicStatus = "Processing";
+  if (rawStatus.includes("deliver")) {
+    publicStatus = "Delivered";
+  } else if (rawStatus.includes("customs") || rawStatus.includes("clearance")) {
+    publicStatus = "At customs";
+  } else if (rawStatus.includes("port") || rawStatus.includes("terminal")) {
+    publicStatus = "At port";
+  } else if (rawStatus.includes("transit") || rawStatus.includes("depart")) {
+    publicStatus = "In transit";
   }
 
   return {
-    badge: shipment.status || "Tracking",
-    title: shipment.sub_status || "Shipment status available.",
-    text: "Live shipment data was retrieved from the operations system.",
-    source: "Tracking source: live operations API",
-    details: details
+    badge: publicStatus,
+    title: "Shipment status: " + publicStatus + ".",
+    text: "This is a general public update. Sign in to the client portal for detailed progress and invoice information.",
+    source: "General public tracking",
+    details: ["Reference: " + key, "Sign in to the client portal for detailed updates."]
   };
 }
 
 async function fetchTrackingResult(key) {
-  const configuredBase = typeof window !== "undefined" && window.BANI_API_BASE
-    ? String(window.BANI_API_BASE).replace(/\/$/, "")
-    : "";
-  const candidates = [];
-
-  if (configuredBase) {
-    candidates.push(configuredBase + "/api/shipment/" + encodeURIComponent(key));
+  try {
+    const response = await fetch("/public-tracking.php?reference=" + encodeURIComponent(key), {
+      headers: { Accept: "application/json" }
+    });
+    const payload = await response.json();
+    return mapApiTrackingResult(payload, key);
+  } catch (error) {
+    return {
+      badge: "Unavailable",
+      title: "Tracking is temporarily unavailable.",
+      text: "Please try again shortly or contact operations for help.",
+      source: "General public tracking",
+      details: ["Detailed shipment updates remain available in the client portal."]
+    };
   }
-
-  candidates.push("/api/shipment/" + encodeURIComponent(key));
-
-  for (let index = 0; index < candidates.length; index += 1) {
-    try {
-      const response = await fetch(candidates[index], {
-        headers: {
-          Accept: "application/json"
-        }
-      });
-
-      if (!response.ok) {
-        continue;
-      }
-
-      const payload = await response.json();
-      return mapApiTrackingResult(payload, key);
-    } catch (error) {
-      // Continue to the next candidate or fallback.
-    }
-  }
-
-  return fallbackTrackingResult(key);
 }
 
 async function renderTrackingResult() {
@@ -412,9 +383,9 @@ async function renderTrackingResult() {
     renderStatusCard({
       badge: "Tracking Status",
       title: "Enter a tracking number.",
-      text: "Provide a shipment reference to retrieve the latest status.",
-      source: "Tracking source: awaiting lookup",
-      details: ["Try BG000001, BG000014, or BG000027."]
+      text: "Enter the shipment reference for a general status update.",
+      source: "General public tracking",
+      details: ["Sign in to the client portal for detailed progress and invoice information."]
     });
     return;
   }
