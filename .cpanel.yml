@@ -25,6 +25,7 @@ deployment:
     - /bin/cp -R login.php $DEPLOYPATH
     - /bin/cp -R logout.php $DEPLOYPATH
     - /bin/cp -R portal-data.php $DEPLOYPATH
+    - /bin/cp -R password-reset.php $DEPLOYPATH
     - /bin/cp -R public-tracking.php $DEPLOYPATH
     - /bin/cp -R quote-request-detail.php $DEPLOYPATH
     - /bin/cp -R shipment-detail.php $DEPLOYPATH
