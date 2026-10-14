@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/auth.php';
 
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Referrer-Policy: no-referrer');
+header('X-Content-Type-Options: nosniff');
+
 $token = trim((string) ($_POST['token'] ?? $_GET['token'] ?? ''));
 $error = '';
 $message = '';
@@ -25,16 +29,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Staff Password | Bani Global Logistics Limited</title>
+    <meta name="referrer" content="no-referrer">
+    <title>Reset Portal Password | Bani Global Logistics Limited</title>
     <link rel="stylesheet" href="/css/style.css">
   </head>
   <body class="dashboard-page">
     <main class="dashboard-shell">
       <section class="dashboard-hero">
         <div>
-          <div class="eyebrow">Staff account security</div>
+          <div class="eyebrow">Portal account security</div>
           <h1>Choose a new password</h1>
-          <p>Reset links work once and expire after 60 minutes. Your new password must be at least 12 characters long.</p>
+          <p>This one-time reset link expires after 60 minutes. Your new password must be at least 12 characters long.</p>
         </div>
       </section>
 
