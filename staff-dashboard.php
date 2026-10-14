@@ -32,9 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$shipments = bani_fetch_shipments(null, 12);
-$quotes = bani_fetch_quotes(null, 6);
-$invoices = bani_fetch_invoices(null, 6);
+$shipments = bani_fetch_shipments(null, 100);
+$invoices = bani_fetch_invoices(null, 100);
 $incomingRequests = bani_fetch_incoming_requests(null, 6);
 $quoteRequests = bani_fetch_quote_requests(8);
 $myEmail = (string) ($user['email'] ?? '');
@@ -43,8 +42,16 @@ $myShipments = array_values(array_filter(
     static fn(array $shipment): bool => strtolower((string) ($shipment['assigned_to'] ?? '')) === strtolower($myEmail)
 ));
 $customsShipments = array_values(array_filter(
-    $shipments,
+    $myShipments,
     static fn(array $shipment): bool => stripos((string) ($shipment['status'] ?? ''), 'customs') !== false
+));
+$assignedShipmentReferences = array_fill_keys(array_map(
+    static fn(array $shipment): string => strtoupper((string) ($shipment['reference'] ?? '')),
+    $myShipments
+), true);
+$invoices = array_values(array_filter(
+    $invoices,
+    static fn(array $invoice): bool => isset($assignedShipmentReferences[strtoupper((string) ($invoice['tracking_reference'] ?? ''))])
 ));
 $pendingInvoices = array_values(array_filter(
     $invoices,
@@ -98,9 +105,8 @@ $myQuoteRequests = array_values(array_filter(
           </p>
         </div>
         <div class="dashboard-actions">
-          <a class="button primary" href="create-shipment.php">Create Shipment</a>
-          <a class="button secondary" href="create-invoice.php">Create Invoice</a>
           <a class="button secondary" href="track.html">Open Tracking</a>
+          <span class="dashboard-subtitle">Ask an administrator to create shipments and invoices or assign new requests.</span>
         </div>
       </section>
 
@@ -218,7 +224,7 @@ $myQuoteRequests = array_values(array_filter(
                           <?php endforeach; ?>
                         </select>
                         <input type="text" name="next_step" value="<?= htmlspecialchars((string) ($shipment['next_step'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" placeholder="Next step">
-                        <textarea name="internal_notes" placeholder="Operational note"><?= htmlspecialchars((string) ($shipment['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <textarea name="customer_update" placeholder="Update visible to the client"></textarea>
                         <button type="submit">Save Update</button>
                       </form>
                     </td>
