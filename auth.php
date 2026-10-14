@@ -2,6 +2,14 @@
 declare(strict_types=1);
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    $https = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== '' && strtolower((string) $_SERVER['HTTPS']) !== 'off';
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $https,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 
@@ -331,6 +339,7 @@ function bani_current_user(): ?array
         return null;
     }
 
+    session_regenerate_id(true);
     $_SESSION['bani_user'] = [
         'email' => $freshUser['email'],
         'role' => $freshUser['role'],
