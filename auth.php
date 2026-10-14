@@ -338,6 +338,10 @@ function bani_current_user(): ?array
     if ($freshUser === null) {
         return null;
     }
+    if (($freshUser['status'] ?? 'active') !== 'active') {
+        bani_logout();
+        return null;
+    }
 
     $sessionFingerprint = (string) ($user['auth_password_fingerprint'] ?? '');
     $freshFingerprint = hash('sha256', (string) ($freshUser['password_hash'] ?? ''));
@@ -355,6 +359,7 @@ function bani_current_user(): ?array
         'status' => $freshUser['status'],
         'created_at' => $freshUser['created_at'],
         'last_login_at' => $freshUser['last_login_at'],
+        'auth_password_fingerprint' => $freshFingerprint,
     ];
 
     return $_SESSION['bani_user'];
