@@ -659,17 +659,17 @@ function bani_send_staff_password_reset(string $email): array
 {
     $actor = bani_current_user();
     if (!is_array($actor) || ($actor['role'] ?? '') !== 'admin') {
-        return ['success' => false, 'message' => 'Only administrators can send staff reset links.'];
+        return ['success' => false, 'message' => 'Only administrators can send portal account reset links.'];
     }
 
     $user = bani_find_user($email);
-    if (!is_array($user) || ($user['role'] ?? '') !== 'staff') {
-        return ['success' => false, 'message' => 'The staff account could not be found.'];
+    if (!is_array($user) || !in_array((string) ($user['role'] ?? ''), ['staff', 'admin'], true)) {
+        return ['success' => false, 'message' => 'The portal account could not be found.'];
     }
 
     $email = strtolower(trim((string) ($user['email'] ?? '')));
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        return ['success' => false, 'message' => 'A valid staff email is required to send a reset link.'];
+        return ['success' => false, 'message' => 'A valid account email is required to send a reset link.'];
     }
 
     $token = bin2hex(random_bytes(32));
@@ -704,7 +704,7 @@ function bani_send_staff_password_reset(string $email): array
     }
 
     $url = 'https://banilogistics.co.ke/password-reset.php?token=' . rawurlencode($token);
-    $subject = 'Bani Logistics staff password reset';
+    $subject = 'Bani Logistics portal password reset';
     $body = "A password reset was requested for your staff account.\n\n"
         . "Open this one-time link within 60 minutes to choose a new password:\n" . $url . "\n\n"
         . "If you did not request this, ignore this email.\n";
@@ -725,7 +725,7 @@ function bani_send_staff_password_reset(string $email): array
         return ['success' => false, 'message' => 'The reset email could not be sent. Check cPanel email delivery settings.'];
     }
 
-    error_log('Staff password reset link issued by admin for ' . $email);
+    error_log('Portal password reset link issued by admin for ' . $email);
 
     return ['success' => true, 'message' => 'A one-time password reset link was sent to ' . $email . '.'];
 }
@@ -765,7 +765,7 @@ function bani_complete_staff_password_reset(string $token, string $password, str
     }
 
     $user = $email !== '' ? bani_find_user($email) : null;
-    if (!is_array($user) || ($user['role'] ?? '') !== 'staff') {
+    if (!is_array($user) || !in_array((string) ($user['role'] ?? ''), ['staff', 'admin'], true)) {
         return ['success' => false, 'message' => 'This reset link is invalid or has expired.'];
     }
 
@@ -798,7 +798,7 @@ function bani_complete_staff_password_reset(string $token, string $password, str
         bani_save_password_reset_rows($rows);
     }
 
-    error_log('Staff password reset completed for ' . $email);
+    error_log('Portal password reset completed for ' . $email);
 
     return ['success' => true, 'message' => 'Password reset successfully. You can now sign in with your new password.'];
 }
