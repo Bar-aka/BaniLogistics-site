@@ -115,6 +115,35 @@ try {
             $stmt = $pdo->prepare('INSERT INTO portal_supplier_orders (client_email,client_name,address_id,address_snapshot,retailer,order_reference,supplier_tracking_number,item_description,document_filename,document_original_name) VALUES (?,?,?,?,?,?,?,?,?,?)');
             $stmt->execute([$email, $name, $addressId, $snapshot, $retailer, trim((string)($_POST['order_reference'] ?? '')) ?: null, trim((string)($_POST['supplier_tracking_number'] ?? '')) ?: null, $description, $documentName, $originalName]);
             $success = 'Purchase details submitted to Bani operations.';
+        } elseif ($action === 'update-customer-order' && $role === 'client') {
+            $id = (int) ($_POST['order_id'] ?? 0);
+            $check = $pdo->prepare('SELECT * FROM portal_supplier_orders WHERE id=? AND LOWER(client_email)=?');
+            $check->execute([$id, $email]);
+            $order = $check->fetch(PDO::FETCH_ASSOC);
+            if (!$order) throw new RuntimeException('That purchase record is unavailable to your account.');
+            $documentName = $order['document_filename'];
+            $originalName = $order['document_original_name'];
+            $file = $_FILES['order_document'] ?? null;
+            if (is_array($file) && ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK || (int)($file['size'] ?? 0) > 8 * 1024 * 1024) {
+                    throw new RuntimeException('The document could not be uploaded or exceeds the 8 MB limit.');
+                }
+                $mime = (new finfo(FILEINFO_MIME_TYPE))->file((string)$file['tmp_name']);
+                $extensions = ['application/pdf'=>'pdf','image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp'];
+                if (!isset($extensions[$mime])) throw new RuntimeException('Upload a PDF, JPG, PNG, or WEBP document.');
+                $folder = __DIR__ . '/storage/supplier-orders';
+                if (!is_dir($folder) && !mkdir($folder, 0750, true) && !is_dir($folder)) throw new RuntimeException('Secure document storage is unavailable.');
+                $documentName = bin2hex(random_bytes(24)) . '.' . $extensions[$mime];
+                if (!move_uploaded_file((string)$file['tmp_name'], $folder . '/' . $documentName)) throw new RuntimeException('Unable to save the uploaded document.');
+                $originalName = substr(basename((string)($file['name'] ?? 'order-document')), 0, 255);
+            }
+            $stmt = $pdo->prepare('UPDATE portal_supplier_orders SET order_reference=?,supplier_tracking_number=?,document_filename=?,document_original_name=? WHERE id=? AND LOWER(client_email)=?');
+            $stmt->execute([
+                trim((string)($_POST['order_reference'] ?? '')) ?: null,
+                trim((string)($_POST['supplier_tracking_number'] ?? '')) ?: null,
+                $documentName, $originalName, $id, $email
+            ]);
+            $success = 'Your purchase details have been updated for Bani operations.';
         } elseif ($action === 'update-order' && in_array($role, ['staff','admin'], true)) {
             $id = (int) ($_POST['order_id'] ?? 0);
             $check = $pdo->prepare('SELECT * FROM portal_supplier_orders WHERE id=?' . ($role === 'staff' ? ' AND LOWER(assigned_to)=?' : ''));
