@@ -187,3 +187,45 @@ CREATE TABLE IF NOT EXISTS portal_password_resets (
   INDEX idx_portal_password_resets_email (email),
   INDEX idx_portal_password_resets_expiry (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS portal_delivery_addresses (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  label VARCHAR(120) NOT NULL,
+  recipient VARCHAR(190) NOT NULL,
+  address_line1 VARCHAR(255) NOT NULL,
+  address_line2 VARCHAR(255) NULL,
+  city VARCHAR(120) NOT NULL,
+  region VARCHAR(120) NULL,
+  postal_code VARCHAR(40) NULL,
+  country VARCHAR(120) NOT NULL,
+  phone VARCHAR(60) NULL,
+  instructions TEXT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_delivery_addresses_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS portal_supplier_orders (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  client_email VARCHAR(190) NOT NULL,
+  client_name VARCHAR(190) NOT NULL,
+  address_id INT UNSIGNED NULL,
+  address_snapshot TEXT NOT NULL,
+  retailer VARCHAR(190) NOT NULL,
+  order_reference VARCHAR(190) NULL,
+  supplier_tracking_number VARCHAR(190) NULL,
+  item_description TEXT NOT NULL,
+  document_filename VARCHAR(255) NULL,
+  document_original_name VARCHAR(255) NULL,
+  status VARCHAR(60) NOT NULL DEFAULT 'Submitted',
+  assigned_to VARCHAR(190) NULL,
+  assigned_name VARCHAR(190) NULL,
+  customer_update TEXT NULL,
+  internal_notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_supplier_orders_client (client_email),
+  INDEX idx_supplier_orders_assigned (assigned_to),
+  INDEX idx_supplier_orders_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
