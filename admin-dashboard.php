@@ -123,6 +123,7 @@ $assignedIncomingRequests = count(array_filter($incomingRequests, static fn(arra
           <a href="track.html">Track Shipment</a>
           <a href="client-dashboard.php">Client Portal</a>
           <a class="active" href="admin-dashboard.php">Admin Dashboard</a>
+          <a href="supplier-orders.php">Delivery Addresses &amp; Purchases</a>
           <a href="logout.php">Logout</a>
         </nav>
       </div>
