@@ -50,6 +50,7 @@ $convertedIncomingRequests = array_values(array_filter(
           <a href="track.html">Track Shipment</a>
           <a class="active" href="client-dashboard.php">Client Portal</a>
           <a href="contact.html">Contact</a>
+          <a href="supplier-orders.php">Delivery Addresses &amp; Purchases</a>
           <a href="logout.php">Logout</a>
         </nav>
       </div>
