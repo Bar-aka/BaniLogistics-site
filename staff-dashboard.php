@@ -89,6 +89,7 @@ $myQuoteRequests = array_values(array_filter(
           <a href="track.html">Track Shipment</a>
           <a href="client-dashboard.php">Client Portal</a>
           <a class="active" href="staff-dashboard.php">Staff Dashboard</a>
+          <a href="supplier-orders.php">Delivery Addresses &amp; Purchases</a>
           <a href="logout.php">Logout</a>
         </nav>
       </div>
