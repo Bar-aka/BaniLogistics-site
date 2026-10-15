@@ -10,6 +10,7 @@ $name = (string) ($user['name'] ?? '');
 $pdo = bani_db();
 $error = '';
 $success = '';
+$schemaReady = false;
 
 function so_h(mixed $value): string {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
@@ -46,6 +47,7 @@ function so_install(PDO $pdo): void {
 try {
     if (!$pdo) throw new RuntimeException('Portal database is not configured.');
     so_install($pdo);
+    $schemaReady = true;
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!bani_verify_csrf_token((string) ($_POST['csrf_token'] ?? ''))) {
             throw new RuntimeException('Your session expired. Refresh the page and try again.');
@@ -88,7 +90,7 @@ try {
             $retailer = trim((string) ($_POST['retailer'] ?? ''));
             $description = trim((string) ($_POST['item_description'] ?? ''));
             if ($retailer === '' || $description === '') throw new RuntimeException('Enter the store and a short item description.');
-            if (mb_strlen($retailer) > 190 || mb_strlen($description) > 10000) throw new RuntimeException('Some order details are too long.');
+            if (strlen($retailer) > 190 || strlen($description) > 10000) throw new RuntimeException('Some order details are too long.');
             $documentName = null;
             $originalName = null;
             $file = $_FILES['order_document'] ?? null;
@@ -145,15 +147,15 @@ try {
 } catch (Throwable $exception) {
     $error = $exception instanceof PDOException ? 'The portal could not save this record. Please try again or contact operations.' : $exception->getMessage();
 }
-$addressStmt = $pdo ? $pdo->query('SELECT * FROM portal_delivery_addresses ' . ($role === 'client' ? 'WHERE is_active=1 ' : '') . 'ORDER BY is_active DESC,label ASC') : false;
+$addressStmt = ($pdo && $schemaReady) ? $pdo->query('SELECT * FROM portal_delivery_addresses ' . ($role === 'client' ? 'WHERE is_active=1 ' : '') . 'ORDER BY is_active DESC,label ASC') : false;
 $addresses = $addressStmt ? $addressStmt->fetchAll(PDO::FETCH_ASSOC) : [];
-if ($pdo) {
+if ($pdo && $schemaReady) {
     if ($role === 'client') { $stmt=$pdo->prepare('SELECT * FROM portal_supplier_orders WHERE LOWER(client_email)=? ORDER BY created_at DESC'); $stmt->execute([$email]); }
     elseif ($role === 'staff') { $stmt=$pdo->prepare('SELECT * FROM portal_supplier_orders WHERE LOWER(assigned_to)=? ORDER BY created_at DESC'); $stmt->execute([$email]); }
     else { $stmt=$pdo->query('SELECT * FROM portal_supplier_orders ORDER BY created_at DESC'); }
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else $orders = [];
-$staffUsers = ($role === 'admin' && $pdo) ? $pdo->query("SELECT email,name FROM portal_users WHERE role='staff' AND status='active' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC) : [];
+$staffUsers = ($role === 'admin' && $pdo && $schemaReady) ? $pdo->query("SELECT email,name FROM portal_users WHERE role='staff' AND status='active' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC) : [];
 ?>
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
